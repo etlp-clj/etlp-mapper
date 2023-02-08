@@ -1,0 +1,129 @@
+{:duct.profile/base
+ {:duct.core/project-ns etlp-mapper
+
+  :duct.router/ataraxy
+  {:routes {[:get "/"] [:etlp-mapper.handler/index]
+            [:get "/mappings"] [:etlp-mapper.handler.mappings/list]
+            [:post "/mappings" {{:keys [title content]} :body-params}]
+            [:etlp-mapper.handler.mappings/create title content]
+
+            [:put "/mappings/" id {{:keys [content]} :body-params}]
+            [:etlp-mapper.handler.mappings/update ^int id content]
+
+            [:post "/mappings/" id "/apply" {{:keys [data]} :body-params}]
+            [:etlp-mapper.handler/apply-mappings ^int id data]
+
+            [:post "/mappings/test"]
+            [:etlp-mapper.handler/mappings]
+
+            [:get    "/mappings/" id] [:etlp-mapper.handler.mappings/find ^int id]
+            [:get    "/mappings/" id "/_history"] [:etlp-mapper.handler.mappings/history ^int id]
+            [:get    "/mappings/" id "/_history/" version] [:etlp-mapper.handler.mappings/traverse-history ^int id version]
+            [:delete "/mappings/" id] [:etlp-mapper.handler.mappings/destroy ^int id]}}
+
+  :duct.migrator/ragtime
+  {:migrations [#ig/ref :etlp-mapper.migration/create-mappings
+                #ig/ref :etlp-mapper.migration/create-mappings-history
+                #ig/ref :etlp-mapper.migration/insert-mapping-history
+                #ig/ref :etlp-mapper.migration/insert_mapping_history_trigger
+                #ig/ref :etlp-mapper.migration/updated-at-trigger
+                #ig/ref :etlp-mapper.migration/updated-mapping-trigger]}
+
+  ; Mapper specific tables
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-mappings]
+  {:up ["CREATE TABLE mappings (id SERIAL PRIMARY KEY, title TEXT NOT NULL, content JSONB, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"]
+   :down ["DROP TABLE mappings"]}
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-mappings-history]
+  {:up ["CREATE TABLE mappings_history (id SERIAL PRIMARY KEY, original_id INT, txnid TEXT, title TEXT NOT NULL, content JSONB, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE)"]
+   :down ["DROP TABLE mappings_history"]}
+
+;DB procedure and triggers for cross cutting concerns
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration/insert-mapping-history]
+  {:up ["CREATE OR REPLACE FUNCTION insert_mapping_history()
+RETURNS TRIGGER AS $$
+DECLARE
+  txnid TEXT;
+BEGIN
+  txnid := txid_current();
+  INSERT INTO mappings_history (
+    title,
+    content,
+    created_at,
+    updated_at,
+    original_id,
+    txnid
+  )
+  VALUES (
+    OLD.title,
+    OLD.content,
+    OLD.created_at,
+    OLD.updated_at,
+    OLD.id,
+    txnid
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;"]
+   :down ["DROP FUNCTION insert_mapping_history"]}
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration/insert_mapping_history_trigger]
+  {:up ["CREATE TRIGGER insert_mapping_history_trigger BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE FUNCTION insert_mapping_history();"]
+   :down ["DROP TRIGGER insert_mapping_history_trigger"]}
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration/updated-at-trigger]
+  {:up ["CREATE OR REPLACE FUNCTION update_changetimestamp_column() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ language 'plpgsql';"]
+   :down  ["DROP FUNCTION update_changetimestamp_column"]}
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration/updated-mapping-trigger]
+  {:up ["CREATE TRIGGER update_mapping_changetimestamp BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE PROCEDURE update_changetimestamp_column();"]
+   :down  ["DROP TRIGGER update_mapping_changetimestamp"]}
+
+;Query handlers for Rest Endpoints
+  [:duct.handler.sql/query :etlp-mapper.handler.mappings/list]
+  {:sql ["SELECT * FROM mappings"]
+   :hrefs {:href "/mappings/{id}"}}
+
+  :etlp-mapper.handler/index
+  {:db #ig/ref :duct.database/sql}
+
+  :etlp-mapper.handler/mappings
+  {:db #ig/ref :duct.database/sql}
+
+  :etlp-mapper.handler/apply-mappings
+  {:db #ig/ref :duct.database/sql
+   :request {[_ id data] :ataraxy/result}}
+
+  [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create]
+  {:request {[_ title content] :ataraxy/result}
+   :sql     ["INSERT INTO mappings (title, content) VALUES (?, ?)" title content]
+   :location "/mappings/{id}"}
+
+  [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/find]
+  {:request {[_ id] :ataraxy/result}
+   :sql     ["SELECT * FROM mappings WHERE id = ?" id]
+   :hrefs   {:href "/mappings/{id}"}}
+
+  [:duct.handler.sql/execute :etlp-mapper.handler.mappings/destroy]
+  {:request {[_ id] :ataraxy/result}
+   :sql     ["DELETE FROM mappings WHERE id = ?" id]}
+
+  [:duct.handler.sql/execute :etlp-mapper.handler.mappings/update]
+  {:request {[_ id content] :ataraxy/result}
+   :sql     ["UPDATE mappings SET content = ? WHERE id = ?" content id]}
+  [:duct.handler.sql/query :etlp-mapper.handler.mappings/history]
+  {:request {[_ id] :ataraxy/result}
+   :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ?" id]
+   :hrefs {:href "/mappings/{id}/_history/{txnid}"}}
+  [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/traverse-history]
+  {:request {[_ id version] :ataraxy/result}
+   :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND mh.txnid = ?" id version]}}
+
+ :duct.profile/dev   #duct/include "dev"
+ :duct.profile/local #duct/include "local"
+ :duct.profile/prod  {}
+
+ :duct.module/logging {}
+ :duct.module.web/api
+ {}
+
+
+
+ :duct.module/sql
+ {}}
