@@ -14,3 +14,5 @@ pom.xml.asc
 /dev/src/local.clj
 .clj-kondo
 .lsp
+.env
+.env-vars
