@@ -46,7 +46,7 @@
 (defn call-openai-api [prompt]
   (http/post "https://api.openai.com/v1/completions"
              {:headers {"Content-Type" "application/json"
-                        "Authorization" "Bearer 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"}
+                        "Authorization" "Bearer :/"}
               :body (json/encode {:prompt prompt :model "text-davinci-003" :max_tokens 2000 :n 1 :stop "---"})}))
 
 
