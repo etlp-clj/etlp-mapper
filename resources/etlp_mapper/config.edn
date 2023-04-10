@@ -16,6 +16,10 @@
             [:post "/mappings/test"]
             [:etlp-mapper.handler/mappings]
 
+            [:post "/mappings/ai"]
+            [:etlp-mapper.handler/openai]
+
+
             [:get    "/mappings/" id] [:etlp-mapper.handler.mappings/find ^int id]
             [:get    "/mappings/" id "/_history"] [:etlp-mapper.handler.mappings/history ^int id]
             [:get    "/mappings/" id "/_history/" version] [:etlp-mapper.handler.mappings/traverse-history ^int id version]
@@ -86,6 +90,9 @@ $$ LANGUAGE plpgsql;"]
   :etlp-mapper.handler/mappings
   {:db #ig/ref :duct.database/sql}
 
+   :etlp-mapper.handler/openai
+  {:db #ig/ref :duct.database/sql}
+
   :etlp-mapper.handler/apply-mappings
   {:db #ig/ref :duct.database/sql
    :request {[_ id data] :ataraxy/result}}
@@ -112,16 +119,15 @@ $$ LANGUAGE plpgsql;"]
   [:duct.handler.sql/query :etlp-mapper.handler.mappings/history]
   {:request {[_ id] :ataraxy/result}
    :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ?" id]
-   :hrefs {:href "/mappings/{id}/_history/{txnid}"}
-   }
+   :hrefs {:href "/mappings/{id}/_history/{txnid}"}}
 
   [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/traverse-history]
   {:request {[_ id version] :ataraxy/result}
    :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND mh.txnid = ?" id version]}}
 
  :duct.profile/dev   #duct/include "dev"
- :duct.profile/local #duct/include "local"
- :duct.profile/prod  {}
+; :duct.profile/local #duct/include "local"
+ :duct.profile/prod  #duct/include "prod.edn"
 
  :duct.module/logging {}
  :duct.module.web/api

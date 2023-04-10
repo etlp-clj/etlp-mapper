@@ -9,6 +9,7 @@
                  [duct/module.logging "0.5.0"]
                  [duct/module.sql "0.6.1"]
                  [duct/module.web "0.7.3"]
+                 [clj-http "3.12.3"]
                  [com.health-samurai/jute "0.2.0-SNAPSHOT"]
                  [org.postgresql/postgresql "42.2.19"]
                  [clj-postgresql "0.7.0"]]
@@ -19,10 +20,14 @@
   :middleware     [lein-duct.plugin/middleware]
   :profiles
   {:dev  [:project/dev :profiles/dev]
+   :prod  [:project/prod :profiles/prod]
    :repl {:prep-tasks   ^:replace ["javac" "compile"]
           :repl-options {:init-ns user}}
    :uberjar {:aot :all}
-   :profiles/dev {}
+   :profiles/prod {}
+   :project/prod {:source-paths ["prod/src"]
+                  :resource-paths ["prod/resources"]}
+   :profiles/dev {} 
    :project/dev  {:source-paths   ["dev/src"]
                   :resource-paths ["dev/resources"]
                   :dependencies   [[integrant/repl "0.3.2"]
