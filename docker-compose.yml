@@ -1,0 +1,20 @@
+version: "3"
+
+services:
+  app:
+    image: "etlp-mapper"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    environment:
+      JDBC_URL: "jdbc:postgresql://db:5432/mapper?user=postgres&password=postgres"
+
+  db:
+    image: postgres
+    environment:
+      POSTGRES_DB: mapper
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
