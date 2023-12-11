@@ -44,11 +44,10 @@
 
 
 (defn call-openai-api [prompt]
-  (http/post "https://api.openai.com/v1/completions"
+  (http/post "https://api.openai.com/v1/chat/completions"
              {:headers {"Content-Type" "application/json"
-                        "Authorization" "Bearer :/"}
-              :body (json/encode {:prompt prompt :model "text-davinci-003" :max_tokens 2000 :n 1 :stop "---"})}))
-
+                        "Authorization" "Bearer foo"}
+              :body prompt}))
 
 (defn create-prompt [input-sample output-sample]
   (str "I want you to generate a Jute.clj template that maps the given input YAML data to the specified output YAML data. The task is to create a Jute.clj template using a YAML-based DSL similar to the example provided below. The example demonstrates a FizzBuzz implementation in Jute.clj YAML syntax:\n\n"
@@ -145,6 +144,44 @@
        "Please create a code template that uses the appropriate props to fulfill the user's requirements. Ensure that the generated code is valid React code, adheres to the @innovaccer/design-system library conventions, and is efficient and easy to read.\n\n"
        "---\n"))
 
+
+
+(defn generate-gpt-prompt [inputExample outputExample]
+  (str ";; GPT Prompt for Generating JUTE Mapping\n"
+       ";; ---------------------------------------\n"
+       ";; Input: FHIR Resource (YAML)\n"
+       ";; Output: Custom YAML Schema\n"
+       ";; Requirement: Generate a JUTE template for the transformation\n\n"
+       ";; FHIR Resource Example:\n"
+       inputExample "\n\n"
+       ";; Desired Output Schema:\n"
+       outputExample "\n\n"
+       ";; Instructions for GPT:\n"
+       ";; Use only the supported JUTE functions like joinStr, concat, merge, etc.\n"
+       ";; Ensure the JUTE template is in valid syntax and correctly maps the input to the desired output.\n"
+       ";; Provide the JUTE template in Clojure syntax.\n\n"
+       ";; GPT, please generate the JUTE template:\n"))
+
+
+(defn generate-gpt-json-payload [inputExample outputExample]
+  (let [prompt (str ";; GPT Prompt for Generating JUTE Mapping\n"
+                    ";; ---------------------------------------\n"
+                    ";; Input: FHIR Resource YAML\n"
+                    ";; Output: Custom YAML Schema\n"
+                    ";; Requirement: Generate a JUTE template for the transformation\n\n"
+                    ";; FHIR Resource Example:\n"
+                    inputExample "\n\n"
+                    ";; Desired Output Schema:\n"
+                    outputExample "\n\n"
+                    ";; Instructions for GPT:\n"
+                    ";; Use only the supported JUTE functions like joinStr, concat, merge, etc.\n"
+                    ";; Ensure the JUTE template is in valid syntax and correctly maps the input to the desired output.\n"
+                    ";; GPT, please generate the JUTE template:\n")]
+    (json/encode
+      {:model "gpt-4-turbo"
+       :messages [{:role "system" :content "You are a helpful data mapping assistant."}
+                  {:role "user" :content prompt}]})))
+
 (defn extract-jute-template [response]
   (let [text (:text (first (:choices response)))]
     (s/trim text)))
@@ -154,11 +191,9 @@
         parsed-data (yaml/parse-string yaml-content :keywords true)
         template (-> parsed-data :result)
         scope (-> parsed-data :scope)
-        prompt (create-prompt-with-reduce (yaml/generate-string scope) (yaml/generate-string template))
+        prompt (generate-gpt-json-payload (yaml/generate-string scope) (yaml/generate-string template))
         result (call-openai-api prompt)]
     {:result result}))
-
-
 
 (defn suggest-component [request]
   (let [yaml-content (slurp (:body request))
@@ -174,8 +209,8 @@
   (fn [opts]
     (try
       (let [translated (suggest-mapping opts)  resp (json/decode (get-in translated [:result :body]) true)]
-        (pprint translated)
-        [::response/ok (extract-jute-template resp)])
+        (pprint resp)
+        [::response/ok resp])
       (catch Exception e
         (println e)
         [::response/bad-request {:error (.getMessage e)}]))))
