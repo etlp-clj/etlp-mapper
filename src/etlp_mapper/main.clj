@@ -1,7 +1,7 @@
 (ns etlp-mapper.main
   (:gen-class)
   (:require [duct.core :as duct]
-            [clj-postgresql.types]))
+            [etlp-mapper.pgtypes]))
 
 (duct/load-hierarchy)
 

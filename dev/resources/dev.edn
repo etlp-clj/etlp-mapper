@@ -1,5 +1,5 @@
 {:duct.server.http/jetty
- {:port    3000}
+ {:port    3031}
 
  :duct.database/sql
  {:connection-uri "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres"}}
