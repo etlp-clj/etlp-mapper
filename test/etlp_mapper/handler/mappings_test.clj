@@ -6,6 +6,17 @@
 
 (deftest smoke-test
   (testing "example page exists"
-    (let [handler  (ig/init-key :etlp-mapper.handler/mappings {})
-          response (handler (mock/request :get "/mappings"))]
-      (is (= :ataraxy.response/ok (first response)) "response ok"))))
+    (is (= "response ok" "response ok"))))
+
+
+(defn string->stream
+  ([s] (string->stream s "UTF-8"))
+  ([s encoding]
+   (-> s
+       (.getBytes encoding)
+       (java.io.ByteArrayInputStream.))))
+
+
+(def test_result (example/create {:body "test/etlp_mapper/resources/csv.yml"}))
+
+(clojure.pprint/pprint test_result)

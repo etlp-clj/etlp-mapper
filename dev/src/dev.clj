@@ -8,7 +8,6 @@
             [duct.core.repl :as duct-repl :refer [auto-reset]]
             [eftest.runner :as eftest]
             [integrant.core :as ig]
-            [clj-postgresql.types]
             [integrant.repl :refer [clear halt go init prep reset]]
             [integrant.repl.state :refer [config system]]))
 
