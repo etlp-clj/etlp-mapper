@@ -7,6 +7,7 @@
                  [duct/handler.sql "0.4.0"]
                  [duct/module.ataraxy "0.3.0"]
                  [duct/module.logging "0.5.0"]
+                 [ring-cors "0.1.13"]
                  [com.fasterxml.jackson.core/jackson-databind "2.12.7.1"]
                  [duct/module.sql "0.6.1" :exclusions [integrant medley]]
                  [duct/module.web "0.7.3" :exclusions [integrant medley ring/ring-core com.fasterxml.jackson.core/jackson-databind]]
