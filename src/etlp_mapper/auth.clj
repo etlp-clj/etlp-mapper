@@ -70,8 +70,9 @@
                   org-id  (:org_id claims)
                   identity {:method :oidc
                             :org/id org-id
-                            :claims claims}]
-              (handler (assoc req :identity identity)))
+                            :claims claims}
+                  resp    (handler (assoc req :identity identity))]
+              (assoc resp :identity identity))
             (catch Exception _
               (unauthorized "Invalid token")))
           (unauthorized "Invalid token"))))))
@@ -82,9 +83,11 @@
   ([]
    (fn [handler]
      (fn [req]
-       (if (get-in req [:identity :org/id])
-         (handler req)
-         (forbidden "Organization context required"))))))
+       (let [resp (handler req)]
+         (cond
+           (get-in resp [:identity :org/id]) resp
+           (= 200 (:status resp)) (forbidden "Organization context required")
+           :else resp))))))
 
 (defn require-role
   "Middleware factory enforcing that the authenticated identity has the
