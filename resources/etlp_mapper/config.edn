@@ -3,6 +3,7 @@
 
   :duct.router/ataraxy
   {:routes {[:get "/"] [:etlp-mapper.handler/index]
+            [:get "/whoami"] [:etlp-mapper.handler/whoami]
             [:get "/mappings"] [:etlp-mapper.handler.mappings/list]
             [:post "/mappings" {{:keys [title content]} :body-params}]
             [:etlp-mapper.handler.mappings/create title content]
@@ -34,10 +35,10 @@
 
   ; Mapper specific tables
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-mappings]
-  {:up ["CREATE TABLE mappings (id SERIAL PRIMARY KEY, title TEXT NOT NULL, content JSONB, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"]
+  {:up ["CREATE TABLE mappings (id SERIAL PRIMARY KEY, org_id TEXT NOT NULL, title TEXT NOT NULL, content JSONB, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"]
    :down ["DROP TABLE mappings"]}
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-mappings-history]
-  {:up ["CREATE TABLE mappings_history (id SERIAL PRIMARY KEY, original_id INT, txnid TEXT, title TEXT NOT NULL, content JSONB, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE)"]
+  {:up ["CREATE TABLE mappings_history (id SERIAL PRIMARY KEY, original_id INT, org_id TEXT, txnid TEXT, title TEXT NOT NULL, content JSONB, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE)"]
    :down ["DROP TABLE mappings_history"]}
 
 ;DB procedure and triggers for cross cutting concerns
@@ -48,22 +49,24 @@ DECLARE
   txnid TEXT;
 BEGIN
   txnid := txid_current();
-  INSERT INTO mappings_history (
-    title,
-    content,
-    created_at,
-    updated_at,
-    original_id,
-    txnid
-  )
-  VALUES (
-    OLD.title,
-    OLD.content,
-    OLD.created_at,
-    OLD.updated_at,
-    OLD.id,
-    txnid
-  );
+    INSERT INTO mappings_history (
+      title,
+      content,
+      created_at,
+      updated_at,
+      original_id,
+      org_id,
+      txnid
+    )
+    VALUES (
+      OLD.title,
+      OLD.content,
+      OLD.created_at,
+      OLD.updated_at,
+      OLD.id,
+      OLD.org_id,
+      txnid
+    );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;"]
@@ -79,15 +82,19 @@ $$ LANGUAGE plpgsql;"]
    :down  ["DROP TRIGGER update_mapping_changetimestamp"]}
 
 ;Query handlers for Rest Endpoints
-  [:duct.handler.sql/query :etlp-mapper.handler.mappings/list]
-  {:sql ["SELECT * FROM mappings"]
-   :hrefs {:href "/mappings/{id}"}}
+ [:duct.handler.sql/query :etlp-mapper.handler.mappings/list]
+ {:request {{org-id :org/id} :identity}
+  :sql ["SELECT * FROM mappings WHERE org_id = ?" org-id]
+  :hrefs {:href "/mappings/{id}"}}
 
   :etlp-mapper.handler/hello
   {}
 
   :etlp-mapper.handler/index
   {:db #ig/ref :duct.database/sql}
+
+  :etlp-mapper.handler/whoami
+  {}
 
   :etlp-mapper.handler/mappings
   {:db #ig/ref :duct.database/sql}
@@ -96,33 +103,39 @@ $$ LANGUAGE plpgsql;"]
   {:db #ig/ref :duct.database/sql
    :request {[_ id data] :ataraxy/result}}
 
-  [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create]
-  {:request {[_ title content] :ataraxy/result}
-   :sql     ["INSERT INTO mappings (title, content) VALUES (?, ?)" title content]
-   :location "mappings/{id}"
-   :hrefs {:href "/mappings/{id}"}}
+ [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create]
+ {:request {[_ title content] :ataraxy/result
+            {org-id :org/id} :identity}
+  :sql     ["INSERT INTO mappings (title, content, org_id) VALUES (?, ?, ?)" title content org-id]
+  :location "mappings/{id}"
+  :hrefs {:href "/mappings/{id}"}}
 
-  [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/find]
-  {:request {[_ id] :ataraxy/result}
-   :sql     ["SELECT * FROM mappings WHERE id = ?" id]
-   :hrefs   {:href "/mappings/{id}"}}
+ [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/find]
+ {:request {[_ id] :ataraxy/result
+            {org-id :org/id} :identity}
+  :sql     ["SELECT * FROM mappings WHERE id = ? AND org_id = ?" id org-id]
+  :hrefs   {:href "/mappings/{id}"}}
 
-  [:duct.handler.sql/execute :etlp-mapper.handler.mappings/destroy]
-  {:request {[_ id] :ataraxy/result}
-   :sql     ["DELETE FROM mappings WHERE id = ?" id]}
+ [:duct.handler.sql/execute :etlp-mapper.handler.mappings/destroy]
+ {:request {[_ id] :ataraxy/result
+            {org-id :org/id} :identity}
+  :sql     ["DELETE FROM mappings WHERE id = ? AND org_id = ?" id org-id]}
 
-  [:duct.handler.sql/execute :etlp-mapper.handler.mappings/update]
-  {:request {[_ id content] :ataraxy/result}
-   :sql     ["UPDATE mappings SET content = ? WHERE id = ?" content id]}
+ [:duct.handler.sql/execute :etlp-mapper.handler.mappings/update]
+ {:request {[_ id content] :ataraxy/result
+            {org-id :org/id} :identity}
+  :sql     ["UPDATE mappings SET content = ? WHERE id = ? AND org_id = ?" content id org-id]}
 
-  [:duct.handler.sql/query :etlp-mapper.handler.mappings/history]
-  {:request {[_ id] :ataraxy/result}
-   :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ?" id]
-   :hrefs {:href "/mappings/{id}/_history/{txnid}"}}
+ [:duct.handler.sql/query :etlp-mapper.handler.mappings/history]
+ {:request {[_ id] :ataraxy/result
+            {org-id :org/id} :identity}
+  :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND m.org_id = ? AND mh.org_id = ?" id org-id org-id]
+  :hrefs {:href "/mappings/{id}/_history/{txnid}"}}
 
-  [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/traverse-history]
-  {:request {[_ id version] :ataraxy/result}
-   :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND mh.txnid = ?" id version]}}
+ [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/traverse-history]
+ {:request {[_ id version] :ataraxy/result
+            {org-id :org/id} :identity}
+  :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND mh.txnid = ? AND m.org_id = ? AND mh.org_id = ?" id version org-id org-id]}}
 
  :duct.profile/dev   #duct/include "dev"
 ; :duct.profile/local #duct/include "local"

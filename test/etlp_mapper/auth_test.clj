@@ -1,0 +1,80 @@
+(ns etlp-mapper.auth-test
+  (:require [clojure.test :refer :all]
+            [etlp-mapper.auth :as auth]
+            [ring.util.http-response :as http])
+  (:import (java.security KeyPairGenerator)
+           (com.auth0.jwt JWT)
+           (com.auth0.jwt.algorithms Algorithm)))
+
+(def issuer "http://issuer")
+(def audience "audience")
+
+(defn gen-token
+  "Generate a signed JWT and a verifier function.
+  `claims` is a map of extra claims to embed."
+  [claims]
+  (let [kpg (doto (KeyPairGenerator/getInstance "RSA") (.initialize 2048))
+        kp  (.generateKeyPair kpg)
+        pub (.getPublic kp)
+        priv (.getPrivate kp)
+        alg (Algorithm/RSA256 pub priv)
+        builder (-> (JWT/create)
+                    (.withIssuer issuer)
+                    (.withAudience (into-array String [audience])))
+        builder (reduce (fn [b [k v]] (.withClaim b (name k) (str v))) builder claims)
+        token (.sign builder alg)
+        verifier (fn [t]
+                   (-> (JWT/require alg)
+                       (.withIssuer issuer)
+                       (.withAudience (into-array String [audience]))
+                       .build
+                       (.verify t)))]
+    {:token token :verifier verifier}))
+
+(deftest jwt-success
+  (let [{:keys [token verifier]} (gen-token {:org_id "org-1"})
+        handler (fn [req] (http/ok (get req :identity)))
+        app ((auth/wrap-require-org)
+             ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier})
+              handler))
+        resp (app {:headers {"authorization" (str "Bearer " token)}})]
+    (is (= 200 (:status resp)))
+    (is (= "org-1" (get-in resp [:body :org/id])))))
+
+(deftest jwt-missing-org
+  (let [{:keys [token verifier]} (gen-token {})
+        handler (fn [_] (http/ok))
+        app ((auth/wrap-require-org)
+             ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier})
+              handler))
+        resp (app {:headers {"authorization" (str "Bearer " token)}})]
+    (is (= 403 (:status resp)))))
+
+(deftest jwt-invalid
+  (let [{:keys [token]} (gen-token {:org_id "org-1"})
+        ;; verifier with wrong audience to force failure
+        bad-verifier (fn [t]
+                       (let [kpg (doto (KeyPairGenerator/getInstance "RSA") (.initialize 2048))
+                             kp  (.generateKeyPair kpg)
+                             alg (Algorithm/RSA256 (.getPublic kp) (.getPrivate kp))]
+                         (-> (JWT/require alg)
+                             (.withIssuer issuer)
+                             (.withAudience (into-array String ["other"]))
+                             .build
+                             (.verify t))))
+        handler (fn [_] (http/ok))
+        app ((auth/wrap-require-org)
+             ((auth/wrap-auth {:issuer issuer :audience audience :verifier bad-verifier})
+              handler))
+        resp (app {:headers {"authorization" (str "Bearer " token)}})]
+    (is (= 401 (:status resp)))
+    (is (= "Bearer realm=\"etlp\"" (get-in resp [:headers "WWW-Authenticate"])))) )
+
+(deftest route-protection
+  (let [handler (fn [_] (http/ok))
+        app ((auth/wrap-require-org)
+             ((auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil)})
+              handler))
+        resp (app {})]
+    (is (= 401 (:status resp)))))
+
