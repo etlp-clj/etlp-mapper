@@ -2,4 +2,9 @@
  {:port    3031}
 
  :duct.database/sql
- {:connection-uri "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres"}}
+ {:connection-uri "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres"}
+ 
+ :etlp/middleware.auth
+ {:issuer   #duct/env ["OIDC_ISSUER"]
+  :audience #duct/env ["OIDC_AUDIENCE"]
+  :jwks-uri #duct/env ["OIDC_JWKS_URI"]}}
