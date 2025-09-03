@@ -22,7 +22,7 @@
             [:get    "/mappings/" id "/_history/" version] [:etlp-mapper.handler.mappings/traverse-history ^int id version]
             [:delete "/mappings/" id] [:etlp-mapper.handler.mappings/destroy ^int id]}}
 
-  :duct.handler/root {:middleware [#ig/ref :etlp/middleware.cors
+  :duct.handler/root {:middleware [#ig/ref :etlp-mapper.middleware/cors
                                    #ig/ref :duct.middleware/stack]}
 
   :duct.migrator/ragtime
@@ -152,7 +152,7 @@ $$ LANGUAGE plpgsql;"]
    :sql ["SELECT * FROM mappings WHERE org_id = ?" org-id]
    :hrefs {:href "/mappings/{id}"}}
 
-  :etlp/middleware.cors
+  :etlp-mapper.middleware/cors
   {}
 
   :etlp-mapper.handler/index
