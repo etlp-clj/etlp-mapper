@@ -23,7 +23,9 @@
             [:delete "/mappings/" id] [:etlp-mapper.handler.mappings/destroy ^int id]}}
 
   :duct.handler/root {:middleware [#ig/ref :etlp-mapper.middlewares/cors
-                                   #ig/ref :duct.middleware/stack]}
+                                   #ig/ref :etlp-mapper.auth-component/auth
+                                   #ig/ref :etlp-mapper.auth-component/require-org]}
+
 
   :duct.migrator/ragtime
   {:migrations [#ig/ref :etlp-mapper.migration/create-mappings
