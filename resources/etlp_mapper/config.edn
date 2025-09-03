@@ -99,7 +99,7 @@ $$ LANGUAGE plpgsql;"]
   [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create]
   {:request {[_ title content] :ataraxy/result}
    :sql     ["INSERT INTO mappings (title, content) VALUES (?, ?)" title content]
-   :location "mappings/{id}"
+   :location "/mappings/{id}"
    :hrefs {:href "/mappings/{id}"}}
 
   [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/find]
@@ -130,8 +130,4 @@ $$ LANGUAGE plpgsql;"]
 
  :duct.module/logging {}
  :duct.module.web/api {}
-
-
-
- :duct.module/sql
- {}}
+ :duct.module/sql {}}
