@@ -7,13 +7,13 @@
  :duct.database/sql
  {:connection-uri #duct/env ["JDBC_URL" :or "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres"]}
 
- :etlp/middleware.auth
+ :etlp-mapper.middleware/auth
  {:issuer   #duct/env ["OIDC_ISSUER"]
   :audience #duct/env ["OIDC_AUDIENCE"]
   :jwks-uri #duct/env ["OIDC_JWKS_URI"]}
 
- :etlp/middleware.require-org {}
+ :etlp-mapper.middleware/require-org {}
 
  :duct.middleware/stack
- {:middleware [#ig/ref :etlp/middleware.auth
-               #ig/ref :etlp/middleware.require-org]}}
+ {:middleware [#ig/ref :etlp-mapper.middleware/auth
+               #ig/ref :etlp-mapper.middleware/require-org]}}
