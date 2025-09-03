@@ -78,3 +78,8 @@
         resp (app {})]
     (is (= 401 (:status resp)))))
 
+(deftest jwks-uri-required
+  (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                        #"JWKS URI must be configured"
+                        (auth/wrap-auth {:issuer issuer :audience audience}))))
+

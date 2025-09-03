@@ -10,7 +10,7 @@
  :etlp-mapper.auth-component/auth
  {:issuer   #duct/env ["OIDC_ISSUER"]
   :audience #duct/env ["OIDC_AUDIENCE"]
-  :jwks-uri #duct/env ["OIDC_JWKS_URI"]}
+  :jwks-uri #duct/env ["OIDC_JWKS_URI" :or "http://localhost:8080/realms/mapify/protocol/openid-connect/certs"]}
 
  :etlp-mapper.auth-component/require-org {}
 
