@@ -11,6 +11,6 @@
              :access-control-allow-methods [:get :post :put :delete :options]
              :access-control-allow-headers ["Content-Type" "Authorization"]))
 
-(defmethod ig/init-key :etlp-mapper.middleware/cors
+(defmethod ig/init-key :etlp-mapper.middlewares/cors
   [_ _]
   cors-middleware)

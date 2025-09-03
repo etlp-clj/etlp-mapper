@@ -1,7 +1,9 @@
 (ns etlp-mapper.main
   (:gen-class)
   (:require [duct.core :as duct]
-            [etlp-mapper.pgtypes]))
+            [etlp-mapper.pgtypes]
+            [etl-mapper.auth-component]
+            [etlp-mapper.middlewares]))
 
 (duct/load-hierarchy)
 

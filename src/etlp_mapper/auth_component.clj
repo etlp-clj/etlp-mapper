@@ -3,15 +3,15 @@
   (:require [integrant.core :as ig]
             [etlp-mapper.auth :as auth]))
 
-(defmethod ig/init-key :etlp-mapper.middleware/auth
+(defmethod ig/init-key :etlp-mapper.auth-component/auth
   [_ opts]
   (auth/wrap-auth opts))
 
-(defmethod ig/init-key :etlp-mapper.middleware/require-org
+(defmethod ig/init-key :etlp-mapper.auth-component/require-org
   [_ _]
   (auth/wrap-require-org))
 
-(defmethod ig/init-key :etlp-mapper.middleware/require-role
+(defmethod ig/init-key :etlp-mapper.auth-component/require-role
   [_ {:keys [role]}]
   (auth/require-role role))
 

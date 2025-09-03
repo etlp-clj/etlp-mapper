@@ -22,7 +22,7 @@
             [:get    "/mappings/" id "/_history/" version] [:etlp-mapper.handler.mappings/traverse-history ^int id version]
             [:delete "/mappings/" id] [:etlp-mapper.handler.mappings/destroy ^int id]}}
 
-  :duct.handler/root {:middleware [#ig/ref :etlp-mapper.middleware/cors
+  :duct.handler/root {:middleware [#ig/ref :etlp-mapper.middlewares/cors
                                    #ig/ref :duct.middleware/stack]}
 
   :duct.migrator/ragtime
@@ -79,8 +79,8 @@ $$ LANGUAGE plpgsql;"]
   {:up ["CREATE OR REPLACE FUNCTION update_changetimestamp_column() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ language 'plpgsql';"]
    :down  ["DROP FUNCTION update_changetimestamp_column"]}
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/updated-mapping-trigger]
-  {:up ["CREATE TRIGGER update_mapping_changetimestamp BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE PROCEDURE update_changetimestamp_column();"]
-  :down  ["DROP TRIGGER update_mapping_changetimestamp"]}
+  {:up ["CREATE TRIGGER update_mapping_changetimestamp BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE PROCEDURE update_changetimestamp_column();"]}
+  :down  ["DROP TRIGGER update_mapping_changetimestamp"]
 
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/add-org-id-to-mappings]
   {:up ["ALTER TABLE mappings ADD COLUMN org_id TEXT DEFAULT 'default';"
@@ -152,7 +152,10 @@ $$ LANGUAGE plpgsql;"]
    :sql ["SELECT * FROM mappings WHERE org_id = ?" org-id]
    :hrefs {:href "/mappings/{id}"}}
 
-  :etlp-mapper.middleware/cors
+  :etlp-mapper.middlewares/cors
+  {}
+
+  :etlp-mapper.auth-component/auth
   {}
 
   :etlp-mapper.handler/index
@@ -169,37 +172,37 @@ $$ LANGUAGE plpgsql;"]
    :request {[_ id data] :ataraxy/result}}
 
   [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create]
-  {:request {[_ title content] :ataraxy/result
-            {org-id :org/id} :identity}
+  {:request {[_ title content] :ataraxy/result}
+            {org-id :org/id} :identity
    :sql     ["INSERT INTO mappings (title, content, org_id) VALUES (?, ?, ?)" title content org-id]
    :location "mappings/{id}"
    :hrefs {:href "/mappings/{id}"}}
 
   [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/find]
-  {:request {[_ id] :ataraxy/result
-            {org-id :org/id} :identity}
+  {:request {[_ id] :ataraxy/result}
+            {org-id :org/id} :identity
    :sql     ["SELECT * FROM mappings WHERE id = ? AND org_id = ?" id org-id]
    :hrefs   {:href "/mappings/{id}"}}
 
   [:duct.handler.sql/execute :etlp-mapper.handler.mappings/destroy]
-  {:request {[_ id] :ataraxy/result
-            {org-id :org/id} :identity}
+  {:request {[_ id] :ataraxy/result}
+            {org-id :org/id} :identity
    :sql     ["DELETE FROM mappings WHERE id = ? AND org_id = ?" id org-id]}
 
   [:duct.handler.sql/execute :etlp-mapper.handler.mappings/update]
-  {:request {[_ id content] :ataraxy/result
-            {org-id :org/id} :identity}
+  {:request {[_ id content] :ataraxy/result}
+            {org-id :org/id} :identity
    :sql     ["UPDATE mappings SET content = ? WHERE id = ? AND org_id = ?" content id org-id]}
 
   [:duct.handler.sql/query :etlp-mapper.handler.mappings/history]
-  {:request {[_ id] :ataraxy/result
-            {org-id :org/id} :identity}
+  {:request {[_ id] :ataraxy/result}
+            {org-id :org/id} :identity
    :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND m.org_id = ? AND mh.org_id = ?" id org-id org-id]
    :hrefs {:href "/mappings/{id}/_history/{txnid}"}}
 
   [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/traverse-history]
-  {:request {[_ id version] :ataraxy/result
-            {org-id :org/id} :identity}
+  {:request {[_ id version] :ataraxy/result}
+            {org-id :org/id} :identity
    :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND mh.txnid = ? AND m.org_id = ? AND mh.org_id = ?" id version org-id org-id]}}
 
  :duct.profile/dev   #duct/include "dev"
