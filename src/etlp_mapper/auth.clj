@@ -35,22 +35,27 @@
   (http/forbidden {:error message}))
 
 (defn- build-verifier
-  "Create a function that verifies tokens using a JWKS URI."
+  "Create a function that verifies tokens using a JWKS URI.
+
+  Throws an explanatory exception when the `jwks-uri` is nil to make
+  misconfiguration failures easier to diagnose."
   [issuer audience jwks-uri]
-  (let [provider (-> (JwkProviderBuilder. (URL. jwks-uri))
-                     (.cached 10 24 TimeUnit/HOURS)
-                     .build)]
-    (fn [token]
-      (let [jwt   (JWT/decode token)
-            kid   (.getKeyId jwt)
-            jwk   (.get provider kid)
-            pub   (.getPublicKey jwk)
-            algo  (Algorithm/RSA256 pub nil)
-            verifier (-> (JWT/require algo)
-                         (.withIssuer issuer)
-                         (.withAudience (into-array String [audience]))
-                         .build)]
-        (.verify verifier token)))))
+  (if (nil? jwks-uri)
+    (throw (ex-info "JWKS URI must be configured" {:issuer issuer :audience audience}))
+    (let [provider (-> (JwkProviderBuilder. (URL. jwks-uri))
+                      (.cached 10 24 TimeUnit/HOURS)
+                      .build)]
+      (fn [token]
+        (let [jwt   (JWT/decode token)
+              kid   (.getKeyId jwt)
+              jwk   (.get provider kid)
+              pub   (.getPublicKey jwk)
+              algo  (Algorithm/RSA256 pub nil)
+              verifier (-> (JWT/require algo)
+                           (.withIssuer issuer)
+                           (.withAudience (into-array String [audience]))
+                           .build)]
+          (.verify verifier token))))))
 
 (defn wrap-auth
   "Middleware factory that validates bearer tokens and attaches an
