@@ -9,8 +9,5 @@
   :audience #duct/env ["OIDC_AUDIENCE"]
   :jwks-uri #duct/env ["OIDC_JWKS_URI" :or "http://localhost:8080/realms/mapify/protocol/openid-connect/certs"]}
 
- :etlp-mapper.auth-component/require-org {}
-
- :duct.middleware/stack
- {:middleware [#ig/ref :etlp-mapper.auth-component/auth
-               #ig/ref :etlp-mapper.auth-component/require-org]}}
+ :etlp-mapper.auth-component/require-org {}}
+ 
