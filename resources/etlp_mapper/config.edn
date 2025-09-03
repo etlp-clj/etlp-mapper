@@ -81,8 +81,8 @@ $$ LANGUAGE plpgsql;"]
   {:up ["CREATE OR REPLACE FUNCTION update_changetimestamp_column() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ language 'plpgsql';"]
    :down  ["DROP FUNCTION update_changetimestamp_column"]}
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/updated-mapping-trigger]
-  {:up ["CREATE TRIGGER update_mapping_changetimestamp BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE PROCEDURE update_changetimestamp_column();"]}
-  :down  ["DROP TRIGGER update_mapping_changetimestamp"]
+  {:up ["CREATE TRIGGER update_mapping_changetimestamp BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE PROCEDURE update_changetimestamp_column();"]
+   :down  ["DROP TRIGGER update_mapping_changetimestamp"]}
 
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/add-org-id-to-mappings]
   {:up ["ALTER TABLE mappings ADD COLUMN org_id TEXT DEFAULT 'default';"
