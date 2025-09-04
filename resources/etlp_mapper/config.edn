@@ -95,58 +95,60 @@ $$ LANGUAGE plpgsql;"]
    :down ["ALTER TABLE mappings_history DROP COLUMN org_id;"]}
 
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/update-insert-mapping-history]
-  {:up ["CREATE OR REPLACE FUNCTION insert_mapping_history()"
-        "RETURNS TRIGGER AS $$"
-        "DECLARE"
-        "  txnid TEXT;"
-        "BEGIN"
-        "  txnid := txid_current();"
-        "  INSERT INTO mappings_history ("
-        "    title,"
-        "    content,"
-        "    created_at,"
-        "    updated_at,"
-        "    original_id,"
-        "    org_id,"
-        "    txnid"
-        "  )"
-        "  VALUES ("
-        "    OLD.title,"
-        "    OLD.content,"
-        "    OLD.created_at,"
-        "    OLD.updated_at,"
-        "    OLD.id,"
-        "    OLD.org_id,"
-        "    txnid"
-        "  );"
-        "  RETURN NEW;"
-        "END;"
-        "$$ LANGUAGE plpgsql;"]
-   :down ["CREATE OR REPLACE FUNCTION insert_mapping_history()"
-          "RETURNS TRIGGER AS $$"
-          "DECLARE"
-          "  txnid TEXT;"
-          "BEGIN"
-          "  txnid := txid_current();"
-          "  INSERT INTO mappings_history ("
-          "    title,"
-          "    content,"
-          "    created_at,"
-          "    updated_at,"
-          "    original_id,"
-          "    txnid"
-          "  )"
-          "  VALUES ("
-          "    OLD.title,"
-          "    OLD.content,"
-          "    OLD.created_at,"
-          "    OLD.updated_at,"
-          "    OLD.id,"
-          "    txnid"
-          "  );"
-          "  RETURN NEW;"
-          "END;"
-          "$$ LANGUAGE plpgsql;"]}
+  {:up   ["CREATE OR REPLACE FUNCTION insert_mapping_history()
+           RETURNS TRIGGER AS $$
+           DECLARE
+             txnid TEXT;
+           BEGIN
+             txnid := txid_current();
+             INSERT INTO mappings_history (
+               title,
+               content,
+               created_at,
+               updated_at,
+               original_id,
+               org_id,
+               txnid
+             )
+             VALUES (
+               OLD.title,
+               OLD.content,
+               OLD.created_at,
+               OLD.updated_at,
+               OLD.id,
+               OLD.org_id,
+               txnid
+             );
+             RETURN NEW;
+           END;
+           $$ LANGUAGE plpgsql;"]
+
+   :down ["CREATE OR REPLACE FUNCTION insert_mapping_history()
+           RETURNS TRIGGER AS $$
+           DECLARE
+             txnid TEXT;
+           BEGIN
+             txnid := txid_current();
+             INSERT INTO mappings_history (
+               title,
+               content,
+               created_at,
+               updated_at,
+               original_id,
+               txnid
+             )
+             VALUES (
+               OLD.title,
+               OLD.content,
+               OLD.created_at,
+               OLD.updated_at,
+               OLD.id,
+               txnid
+             );
+             RETURN NEW;
+           END;
+           $$ LANGUAGE plpgsql;"]}
+
 
 ;Query handlers for Rest Endpoints
   [:duct.handler.sql/query :etlp-mapper.handler.mappings/list]
