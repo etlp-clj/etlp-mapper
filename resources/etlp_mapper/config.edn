@@ -22,9 +22,9 @@
             [:get    "/mappings/" id "/_history/" version] [:etlp-mapper.handler.mappings/traverse-history ^int id version]
             [:delete "/mappings/" id] [:etlp-mapper.handler.mappings/destroy ^int id]}}
 
-  :duct.handler/root {:middleware [#ig/ref :etlp-mapper.middlewares/cors
+  :duct.handler/root {:middleware [#ig/ref :etlp-mapper.auth-component/require-org
                                    #ig/ref :etlp-mapper.auth-component/auth
-                                   #ig/ref :etlp-mapper.auth-component/require-org]}
+                                   #ig/ref :etlp-mapper.middlewares/cors]}
 
 
   :duct.migrator/ragtime
@@ -157,9 +157,6 @@ $$ LANGUAGE plpgsql;"]
    :hrefs {:href "/mappings/{id}"}}
 
   :etlp-mapper.middlewares/cors
-  {}
-
-  :etlp-mapper.auth-component/auth
   {}
 
   :etlp-mapper.handler/index
