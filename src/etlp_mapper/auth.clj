@@ -70,7 +70,6 @@
       (fn [req]
         (if-let [token (bearer-token req)]
           (try
-            (print req)
             (let [decoded (verify token)
                   claims  (decode-claims decoded)
                   org-id  (:org_id claims)
@@ -89,11 +88,9 @@
   ([]
    (fn [handler]
      (fn [req]
-       (let [resp (handler req)]
-         (cond
-           (get-in resp [:identity :org/id]) resp
-           (= 200 (:status resp)) (forbidden "Organization context required")
-           :else resp))))))
+       (if (get-in req [:identity :org/id])
+         (handler req)
+         (forbidden "Organization context required"))))))
 
 (defn require-role
   "Middleware factory enforcing that the authenticated identity has the

@@ -34,21 +34,23 @@
 (deftest jwt-success
   (let [{:keys [token verifier]} (gen-token {:org_id "org-1"})
         handler (fn [req] (http/ok (get req :identity)))
-        app ((auth/wrap-require-org)
-             ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier})
-              handler))
+        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier})
+             ((auth/wrap-require-org) handler))
         resp (app {:headers {"authorization" (str "Bearer " token)}})]
     (is (= 200 (:status resp)))
     (is (= "org-1" (get-in resp [:body :org/id])))))
 
 (deftest jwt-missing-org
   (let [{:keys [token verifier]} (gen-token {})
-        handler (fn [_] (http/ok))
-        app ((auth/wrap-require-org)
-             ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier})
-              handler))
+        called (atom false)
+        handler (fn [_]
+                  (reset! called true)
+                  (http/ok))
+        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier})
+             ((auth/wrap-require-org) handler))
         resp (app {:headers {"authorization" (str "Bearer " token)}})]
-    (is (= 403 (:status resp)))))
+    (is (= 403 (:status resp)))
+    (is (false? @called))))
 
 (deftest jwt-invalid
   (let [{:keys [token]} (gen-token {:org_id "org-1"})
@@ -63,18 +65,16 @@
                              .build
                              (.verify t))))
         handler (fn [_] (http/ok))
-        app ((auth/wrap-require-org)
-             ((auth/wrap-auth {:issuer issuer :audience audience :verifier bad-verifier})
-              handler))
+        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier bad-verifier})
+             ((auth/wrap-require-org) handler))
         resp (app {:headers {"authorization" (str "Bearer " token)}})]
     (is (= 401 (:status resp)))
-    (is (= "Bearer realm=\"etlp\"" (get-in resp [:headers "WWW-Authenticate"])))) )
+    (is (= "Bearer realm=\"mapify\"" (get-in resp [:headers "WWW-Authenticate"])))) )
 
 (deftest route-protection
   (let [handler (fn [_] (http/ok))
-        app ((auth/wrap-require-org)
-             ((auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil)})
-              handler))
+        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil)})
+             ((auth/wrap-require-org) handler))
         resp (app {})]
     (is (= 401 (:status resp)))))
 
