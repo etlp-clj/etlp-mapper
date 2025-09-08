@@ -28,7 +28,7 @@
 (defn- unauthorized
   [message]
   (-> (http/unauthorized {:error message})
-      (http/header "WWW-Authenticate" "Bearer realm=\"etlp\"")))
+      (http/header "WWW-Authenticate" "Bearer realm=\"mapify\"")))
 
 (defn- forbidden
   [message]
@@ -70,6 +70,7 @@
       (fn [req]
         (if-let [token (bearer-token req)]
           (try
+            (print req)
             (let [decoded (verify token)
                   claims  (decode-claims decoded)
                   org-id  (:org_id claims)
