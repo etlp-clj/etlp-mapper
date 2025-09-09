@@ -14,16 +14,15 @@
   (:import java.util.Base64))
 
 (defprotocol Mappings
-  (apply-mapping [db id data]))
+  (apply-mapping [db org-id id data]))
 
 (def parse-decoded-yml (fn [template]
                          (yaml/parse-string template :keywords true)))
 
 (extend-protocol Mappings
   duct.database.sql.Boundary
-  (apply-mapping [{db :spec} id data]
-    (let [results (jdbc/query db [(str "select * from mappings "
-                                       (format "where id='%s'" id))])
+  (apply-mapping [{db :spec} org-id id data]
+    (let [results (jdbc/query db ["select * from mappings where id = ? and org_id = ?" id org-id])
           template (-> results
                        first
                        :content
@@ -34,12 +33,13 @@
       (compiled data))))
 
 (defn create [request]
-  (let [yaml-content (slurp (:body request))
-        parsed-data (yaml/parse-string yaml-content :keywords true)
-        template (-> parsed-data :template)
-        scope (-> parsed-data :scope)
-        compiled (jt/compile template)]
-    {:request (compiled scope)}))
+  (let [org-id      (get-in request [:identity :org/id])
+        yaml-content (slurp (:body request))
+        parsed-data  (yaml/parse-string yaml-content :keywords true)
+        template     (-> parsed-data :template)
+        scope        (-> parsed-data :scope)
+        compiled     (jt/compile template)]
+    (assoc {:request (compiled scope)} :org/id org-id)))
 
 
 (defn extract-jute-template [response]
@@ -49,21 +49,23 @@
 
 
 (defmethod ig/init-key :etlp-mapper.handler/apply-mappings [_ {:keys [db]}]
-  (fn [{[_ id data] :ataraxy/result}]
-    (try
-      (let [translated (apply-mapping db id data)]
-        [::response/ok {:result translated}])
-      (catch Exception e
-        (println e)
-        [::response/bad-request {:error (str e)}]))))
+  (fn [{[_ id data] :ataraxy/result :as request}]
+    (let [org-id (get-in request [:identity :org/id])]
+      (try
+        (let [translated (apply-mapping db org-id id data)]
+          [::response/ok {:result translated :org/id org-id}])
+        (catch Exception e
+          (println e)
+          [::response/bad-request {:error (str e)}])))))
 
 
 (defmethod ig/init-key :etlp-mapper.handler/mappings [_ {:keys [db]}]
-  (fn [opts]
-    (try
-      (let [translated (create opts)] 
-        (pprint translated)
-        [::response/ok translated])
-      (catch Exception e
-        (println e)
-        [::response/bad-request {:error (.getMessage e)}]))))
+  (fn [request]
+    (let [org-id (get-in request [:identity :org/id])]
+      (try
+        (let [translated (create request)]
+          (pprint translated)
+          [::response/ok (assoc translated :org/id org-id)])
+        (catch Exception e
+          (println e)
+          [::response/bad-request {:error (.getMessage e)}])))))
