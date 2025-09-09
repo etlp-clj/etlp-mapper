@@ -18,7 +18,7 @@ $ lein uberjar
 
 ```
 
-#### Run Migrations 
+#### Run Migrations
 
 This service depends on Postgres >= v14.00, after successful java jar build, we need to run the migrations to create basic set of tables for our microservice. Once the migrations are successfully applied, we can simply run our jar and it should start the web server at `localhost:3000`
 
@@ -27,9 +27,11 @@ This service depends on Postgres >= v14.00, after successful java jar build, we 
 
 $  java -jar target/etlp-mapper-0.1.0-SNAPSHOT-standalone.jar :duct/migrator
 
-$  java -jar target/etlp-mapper-0.1.0-SNAPSHOT-standalone.jar 
+$  java -jar target/etlp-mapper-0.1.0-SNAPSHOT-standalone.jar
 
 ```
+
+The migrations create organization-aware `mappings` and `mappings_history` tables, each keyed by an `org_id` used to scope data per tenant. Existing deployments can apply the new migrations to add these columns without dropping data.
 
 
 
@@ -92,6 +94,29 @@ But you can also run tests through Leiningen.
 
 ```sh
 lein test
+```
+
+### OIDC Authentication
+
+The service secures endpoints using Keycloak OIDC. Configure the
+following environment variables before starting the app:
+
+```
+OIDC_ISSUER   = http://localhost:8080/realms/mapify
+OIDC_AUDIENCE = mapify-api
+OIDC_JWKS_URI = http://localhost:8080/realms/mapify/protocol/openid-connect/certs
+```
+
+Run tests (if Leiningen is installed) with:
+
+```sh
+lein test
+```
+
+After acquiring an access token, you can verify authentication with:
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3031/whoami
 ```
 
 ### Bugs

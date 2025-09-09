@@ -1,9 +1,12 @@
 (ns etlp-mapper.main
   (:gen-class)
   (:require [duct.core :as duct]
-            [etlp-mapper.pgtypes]))
+            [etlp-mapper.pgtypes]
+            [etlp-mapper.auth-component]
+            [etlp-mapper.middlewares]))
 
 (duct/load-hierarchy)
+
 
 (defn -main [& args]
   (let [keys     (or (duct/parse-keys args) [:duct/daemon])
