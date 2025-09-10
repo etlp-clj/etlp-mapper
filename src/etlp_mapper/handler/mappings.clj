@@ -10,7 +10,9 @@
             [clj-http.client :as http]
             [yaml.core :as yaml]
             [duct.handler.sql :as sql]
-            [cheshire.core :as json])
+            [cheshire.core :as json]
+            [etlp-mapper.service.audit-logs :as audit-logs]
+            [etlp-mapper.service.ai-usage-logs :as ai-usage-logs])
   (:import java.util.Base64))
 
 (defprotocol Mappings
@@ -50,9 +52,17 @@
 
 (defmethod ig/init-key :etlp-mapper.handler/apply-mappings [_ {:keys [db]}]
   (fn [{[_ id data] :ataraxy/result :as request}]
-    (let [org-id (get-in request [:identity :org/id])]
+    (let [org-id (get-in request [:identity :org/id])
+          user-id (get-in request [:identity :claims :sub])]
       (try
         (let [translated (apply-mapping db org-id id data)]
+          (audit-logs/log! db {:org-id org-id
+                               :user-id user-id
+                               :action "apply-mapping"
+                               :context {:mapping-id id}})
+          (ai-usage-logs/log! db {:org-id org-id
+                                  :user-id user-id
+                                  :feature-type "transform"})
           [::response/ok {:result translated :org/id org-id}])
         (catch Exception e
           (println e)
@@ -61,10 +71,15 @@
 
 (defmethod ig/init-key :etlp-mapper.handler/mappings [_ {:keys [db]}]
   (fn [request]
-    (let [org-id (get-in request [:identity :org/id])]
+    (let [org-id (get-in request [:identity :org/id])
+          user-id (get-in request [:identity :claims :sub])]
       (try
         (let [translated (create request)]
           (pprint translated)
+          (audit-logs/log! db {:org-id org-id
+                               :user-id user-id
+                               :action "create-mapping"
+                               :context {:request (:request translated)}})
           [::response/ok (assoc translated :org/id org-id)])
         (catch Exception e
           (println e)
