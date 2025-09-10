@@ -39,4 +39,3 @@
                                :context {:token token}})
           [::response/ok {:org_id org_id :token token :status "accepted"}])
         [::response/bad-request {:error "Invalid token"}]))))
-

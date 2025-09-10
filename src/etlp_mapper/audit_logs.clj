@@ -20,6 +20,7 @@
   (create-log [{db :spec} data]
     (first (jdbc/insert! db :audit_logs data))))
 
+
 (defn log!
   "Insert a new audit log entry into the audit_logs table. Accepts a database
   boundary and a map with :org-id, :user-id, :action and optional :context."
@@ -28,4 +29,3 @@
                   :user_id user-id
                   :action action
                   :context (when context (pr-str context))}))
-

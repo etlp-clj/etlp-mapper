@@ -20,6 +20,7 @@
   (log-usage [{db :spec} data]
     (first (jdbc/insert! db :ai_usage_logs data))))
 
+
 (defn log!
   "Insert a new AI usage log entry. Accepts a database boundary and a map with
   :org-id, :user-id, :feature-type, :input-tokens and :output-tokens."
