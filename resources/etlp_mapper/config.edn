@@ -4,6 +4,11 @@
   :duct.router/ataraxy
   {:routes {[:get "/"] [:etlp-mapper.handler/index]
             [:get "/whoami"] [:etlp-mapper.handler/whoami]
+            [:post "/orgs"] [:etlp-mapper.handler.orgs/create]
+            [:post "/orgs/" org-id "/invites"] [:etlp-mapper.handler.invites/create org-id]
+            [:post "/invites/accept"] [:etlp-mapper.handler.invites/accept]
+            [:post "/me/active-org"] [:etlp-mapper.handler.me/set-active-org]
+            [:post "/billing/portal"] [:etlp-mapper.handler.billing/portal]
             [:get "/mappings"] [:etlp-mapper.handler.mappings/list]
             [:post "/mappings" {{:keys [title content]} :body-params}]
             [:etlp-mapper.handler.mappings/create title content]
@@ -136,12 +141,22 @@ $$ LANGUAGE plpgsql;"]
   :etlp-mapper.handler/whoami
   {}
 
-  :etlp-mapper.handler/mappings
+  :etlp-mapper.handler.mappings
   {:db #ig/ref :duct.database/sql}
 
   :etlp-mapper.handler/apply-mappings
   {:db #ig/ref :duct.database/sql
    :request {[_ id data] :ataraxy/result}}
+
+  :etlp-mapper.handler.orgs/create {}
+
+  :etlp-mapper.handler.invites/create {}
+
+  :etlp-mapper.handler.invites/accept {}
+
+  :etlp-mapper.handler.me/set-active-org {}
+
+  :etlp-mapper.handler.billing/portal {}
 
   [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create]
   {:request {[_ title content] :ataraxy/result
@@ -178,6 +193,9 @@ $$ LANGUAGE plpgsql;"]
   {:request {[_ id version] :ataraxy/result
              {org-id :org/id} :identity}
    :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND mh.txnid = ? AND m.organization_id = ? AND mh.organization_id = ?::uuid" id version org-id org-id]}}
+
+  :etlp-mapper.auth-component/require-org {}
+  :etlp-mapper.auth-component/require-role {:role :editor}
 
  :duct.profile/dev   #duct/include "dev"
  ; :duct.profile/local #duct/include "local"
