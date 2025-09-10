@@ -79,6 +79,7 @@
                   resp    (handler (assoc req :identity identity))]
               (assoc resp :identity identity))
             (catch Exception _
+              (println _)
               (unauthorized "Invalid token")))
           (unauthorized "Invalid token"))))))
 

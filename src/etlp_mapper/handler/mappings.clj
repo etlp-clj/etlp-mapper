@@ -22,7 +22,7 @@
 (extend-protocol Mappings
   duct.database.sql.Boundary
   (apply-mapping [{db :spec} org-id id data]
-      (let [results (jdbc/query db ["select * from mappings where id = ? and organization_id = ?" id org-id])
+      (let [results (jdbc/query db ["select * from mappings where id = ? and organization_id = ?::uuid" id org-id])
           template (-> results
                        first
                        :content
