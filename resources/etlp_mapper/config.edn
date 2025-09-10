@@ -28,6 +28,7 @@
             [:delete "/mappings/" id] [:etlp-mapper.handler.mappings/destroy ^int id]}}
 
   :duct.handler/root {:middleware [#ig/ref :etlp-mapper.auth-component/require-org
+                                   #ig/ref :etlp-mapper.auth-component/require-role
                                    #ig/ref :etlp-mapper.auth-component/auth
                                    #ig/ref :etlp-mapper.middlewares/cors]}
 
@@ -69,11 +70,11 @@
    :down ["DROP TABLE organization_subscriptions;"]}
 
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-audit-logs]
-  {:up ["CREATE TABLE audit_logs (id BIGSERIAL PRIMARY KEY, organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, user_id UUID REFERENCES users(id), action TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP); CREATE INDEX audit_logs_organization_id_idx ON audit_logs(organization_id); CREATE INDEX audit_logs_user_id_idx ON audit_logs(user_id);"]
+  {:up ["CREATE TABLE audit_logs (id BIGSERIAL PRIMARY KEY, organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, user_id UUID REFERENCES users(id), action TEXT NOT NULL, context TEXT, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP); CREATE INDEX audit_logs_organization_id_idx ON audit_logs(organization_id); CREATE INDEX audit_logs_user_id_idx ON audit_logs(user_id);"]
    :down ["DROP TABLE audit_logs;"]}
 
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-ai-usage-logs]
-  {:up ["CREATE TABLE ai_usage_logs (id BIGSERIAL PRIMARY KEY, organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, user_id UUID REFERENCES users(id), model TEXT NOT NULL, input_tokens INT NOT NULL, output_tokens INT NOT NULL, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP); CREATE INDEX ai_usage_logs_organization_id_idx ON ai_usage_logs(organization_id); CREATE INDEX ai_usage_logs_user_id_idx ON ai_usage_logs(user_id);"]
+  {:up ["CREATE TABLE ai_usage_logs (id BIGSERIAL PRIMARY KEY, organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, user_id UUID REFERENCES users(id), feature_type TEXT NOT NULL, input_tokens INT NOT NULL, output_tokens INT NOT NULL, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP); CREATE INDEX ai_usage_logs_organization_id_idx ON ai_usage_logs(organization_id); CREATE INDEX ai_usage_logs_user_id_idx ON ai_usage_logs(user_id);"]
    :down ["DROP TABLE ai_usage_logs;"]}
 
   ; Mapper specific tables
@@ -148,11 +149,11 @@ $$ LANGUAGE plpgsql;"]
   {:db #ig/ref :duct.database/sql
    :request {[_ id data] :ataraxy/result}}
 
-  :etlp-mapper.handler.orgs/create {}
+  :etlp-mapper.handler.orgs/create {:db #ig/ref :duct.database/sql}
 
-  :etlp-mapper.handler.invites/create {}
+  :etlp-mapper.handler.invites/create {:db #ig/ref :duct.database/sql}
 
-  :etlp-mapper.handler.invites/accept {}
+  :etlp-mapper.handler.invites/accept {:db #ig/ref :duct.database/sql}
 
   :etlp-mapper.handler.me/set-active-org {}
 

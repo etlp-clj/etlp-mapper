@@ -11,7 +11,8 @@
             [yaml.core :as yaml]
             [duct.handler.sql :as sql]
             [cheshire.core :as json]
-            [etlp-mapper.auth :as auth])
+            [etlp-mapper.audit-logs :as audit-logs]
+            [etlp-mapper.ai-usage-logs :as ai-usage-logs])
   (:import java.util.Base64))
 
 (defprotocol Mappings
@@ -23,7 +24,7 @@
 (extend-protocol Mappings
   duct.database.sql.Boundary
   (apply-mapping [{db :spec} org-id id data]
-      (let [results (jdbc/query db ["select * from mappings where id = ? and organization_id = ?::uuid" id org-id])
+    (let [results (jdbc/query db ["select * from mappings where id = ? and organization_id = ?::uuid" id org-id])
           template (-> results
                        first
                        :content
@@ -42,35 +43,40 @@
         compiled     (jt/compile template)]
     (assoc {:request (compiled scope)} :org/id org-id)))
 
-
 (defn extract-jute-template [response]
   (let [text (:text (first (:choices response)))]
     (s/trim text)))
 
-
-
 (defmethod ig/init-key :etlp-mapper.handler/apply-mappings [_ {:keys [db]}]
-  (let [handler (fn [{[_ id data] :ataraxy/result :as request}]
-                  (let [org-id (get-in request [:identity :org/id])]
-                    (try
-                      (let [translated (apply-mapping db org-id id data)]
-                        [::response/ok {:result translated :org/id org-id}])
-                      (catch Exception e
-                        (println e)
-                        [::response/bad-request {:error (str e)}]))))]
-    ((auth/wrap-require-org)
-     ((auth/require-role :editor) handler))))
-
+  (fn [{[_ id data] :ataraxy/result :as request}]
+    (let [org-id (get-in request [:identity :org/id])
+          user-id (get-in request [:identity :claims :sub])]
+      (try
+        (let [translated (apply-mapping db org-id id data)]
+          (audit-logs/log! db {:org-id org-id
+                               :user-id user-id
+                               :action "apply-mapping"
+                               :context {:mapping-id id}})
+          (ai-usage-logs/log! db {:org-id org-id
+                                  :user-id user-id
+                                  :feature-type "transform"})
+          [::response/ok {:result translated :org/id org-id}])
+        (catch Exception e
+          (println e)
+          [::response/bad-request {:error (str e)}])))))
 
 (defmethod ig/init-key :etlp-mapper.handler/mappings [_ {:keys [db]}]
-  (let [handler (fn [request]
-                  (let [org-id (get-in request [:identity :org/id])]
-                    (try
-                      (let [translated (create request)]
-                        (pprint translated)
-                        [::response/ok (assoc translated :org/id org-id)])
-                      (catch Exception e
-                        (println e)
-                        [::response/bad-request {:error (.getMessage e)}]))))]
-    ((auth/wrap-require-org)
-     ((auth/require-role :editor) handler))))
+  (fn [request]
+    (let [org-id (get-in request [:identity :org/id])
+          user-id (get-in request [:identity :claims :sub])]
+      (try
+        (let [translated (create request)]
+          (pprint translated)
+          (audit-logs/log! db {:org-id org-id
+                               :user-id user-id
+                               :action "create-mapping"
+                               :context {:request (:request translated)}})
+          [::response/ok (assoc translated :org/id org-id)])
+        (catch Exception e
+          (println e)
+          [::response/bad-request {:error (.getMessage e)}])))))
