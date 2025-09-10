@@ -214,8 +214,4 @@ $$ LANGUAGE plpgsql;"]
 
  :duct.module/logging {}
  :duct.module.web/api {}
-
-
-
- :duct.module/sql
- {}}
+ :duct.module/sql {}}
