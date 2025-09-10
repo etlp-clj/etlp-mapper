@@ -107,6 +107,15 @@ OIDC_AUDIENCE = mapify-api
 OIDC_JWKS_URI = http://localhost:8080/realms/mapify/protocol/openid-connect/certs
 ```
 
+### Invite Tokens
+
+Configure HMAC invite tokens with:
+
+```
+APP_SECRET=<your-secret>
+INVITE_TTL_DAYS=7
+```
+
 Run tests (if Leiningen is installed) with:
 
 ```sh

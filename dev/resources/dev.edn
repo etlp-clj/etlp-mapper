@@ -11,4 +11,8 @@
 
  :etlp-mapper.auth-component/require-org {}
 
- :etlp-mapper.auth-component/require-role {}}
+ :etlp-mapper.auth-component/require-role {}
+
+ :etlp-mapper.invite/token
+ {:app-secret #duct/env ["APP_SECRET" :or "dev-secret"]
+  :invite-ttl-days #duct/env ["INVITE_TTL_DAYS" :or 7]}}

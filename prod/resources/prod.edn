@@ -5,4 +5,8 @@
  {:port 3000}
 
  :duct.database/sql
- {:connection-uri "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres"}}
+ {:connection-uri "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres"}
+
+ :etlp-mapper.invite/token
+ {:app-secret #duct/env ["APP_SECRET"]
+  :invite-ttl-days #duct/env ["INVITE_TTL_DAYS" :or 7]}}
