@@ -10,7 +10,8 @@
             [clj-http.client :as http]
             [yaml.core :as yaml]
             [duct.handler.sql :as sql]
-            [cheshire.core :as json])
+            [cheshire.core :as json]
+            [etlp-mapper.auth :as auth])
   (:import java.util.Base64))
 
 (defprotocol Mappings
@@ -49,23 +50,27 @@
 
 
 (defmethod ig/init-key :etlp-mapper.handler/apply-mappings [_ {:keys [db]}]
-  (fn [{[_ id data] :ataraxy/result :as request}]
-    (let [org-id (get-in request [:identity :org/id])]
-      (try
-        (let [translated (apply-mapping db org-id id data)]
-          [::response/ok {:result translated :org/id org-id}])
-        (catch Exception e
-          (println e)
-          [::response/bad-request {:error (str e)}])))))
+  (let [handler (fn [{[_ id data] :ataraxy/result :as request}]
+                  (let [org-id (get-in request [:identity :org/id])]
+                    (try
+                      (let [translated (apply-mapping db org-id id data)]
+                        [::response/ok {:result translated :org/id org-id}])
+                      (catch Exception e
+                        (println e)
+                        [::response/bad-request {:error (str e)}]))))]
+    ((auth/wrap-require-org)
+     ((auth/require-role :editor) handler))))
 
 
 (defmethod ig/init-key :etlp-mapper.handler/mappings [_ {:keys [db]}]
-  (fn [request]
-    (let [org-id (get-in request [:identity :org/id])]
-      (try
-        (let [translated (create request)]
-          (pprint translated)
-          [::response/ok (assoc translated :org/id org-id)])
-        (catch Exception e
-          (println e)
-          [::response/bad-request {:error (.getMessage e)}])))))
+  (let [handler (fn [request]
+                  (let [org-id (get-in request [:identity :org/id])]
+                    (try
+                      (let [translated (create request)]
+                        (pprint translated)
+                        [::response/ok (assoc translated :org/id org-id)])
+                      (catch Exception e
+                        (println e)
+                        [::response/bad-request {:error (.getMessage e)}]))))]
+    ((auth/wrap-require-org)
+     ((auth/require-role :editor) handler))))
