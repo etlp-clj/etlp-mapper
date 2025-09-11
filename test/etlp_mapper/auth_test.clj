@@ -98,12 +98,12 @@
 (deftest role-guard-success
   (let [handler (fn [_] (http/ok))
         app ((auth/require-role :admin) handler)
-        resp (app {:identity {:claims {:roles [:admin :user]}}})]
+        resp (app {:identity {:roles #{:admin :user}}})]
     (is (= 200 (:status resp)))))
 
 (deftest role-guard-failure
   (let [handler (fn [_] (http/ok))
         app ((auth/require-role :admin) handler)
-        resp (app {:identity {:claims {:roles [:user]}}})]
+        resp (app {:identity {:roles #{:user}}})]
     (is (= 403 (:status resp)))))
 
