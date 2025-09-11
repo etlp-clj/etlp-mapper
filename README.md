@@ -98,14 +98,17 @@ lein test
 
 ### OIDC Authentication
 
-The service secures endpoints using Keycloak OIDC. Configure the
-following environment variables before starting the app:
+The service secures endpoints using Keycloak OIDC. Configure the following
+environment variables before starting the app. The values shown reflect the
+defaults in the development configuration:
 
-```
-OIDC_ISSUER   = http://localhost:8080/realms/mapify
-OIDC_AUDIENCE = mapify-api
-OIDC_JWKS_URI = http://localhost:8080/realms/mapify/protocol/openid-connect/certs
-```
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `3000` | HTTP server port |
+| `JDBC_URL` | `jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres` | Database connection URI |
+| `OIDC_ISSUER` | `http://localhost:8080/realms/mapify` | Keycloak realm issuer |
+| `OIDC_AUDIENCE` | `mapify-api` | Expected audience of issued tokens |
+| `OIDC_JWKS_URI` | `http://localhost:8080/realms/mapify/protocol/openid-connect/certs` | JWKS endpoint for token verification |
 
 Run tests (if Leiningen is installed) with:
 
@@ -113,9 +116,20 @@ Run tests (if Leiningen is installed) with:
 lein test
 ```
 
-After acquiring an access token, you can verify authentication with:
+After acquiring an access token, you can interact with the API using `curl`:
 
 ```sh
+# list organizations
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3031/orgs
+
+# accept an invitation
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"token":"INVITE_TOKEN"}' http://localhost:3031/invites/accept
+
+# view your active organization
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3031/me/active-org
+
+# identify the current user
 curl -H "Authorization: Bearer $TOKEN" http://localhost:3031/whoami
 ```
 
