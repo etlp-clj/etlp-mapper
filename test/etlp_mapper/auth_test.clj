@@ -94,3 +94,16 @@
                         #"JWKS URI must be configured"
                         (auth/wrap-auth {:issuer issuer :audience audience}))))
 
+
+(deftest role-guard-success
+  (let [handler (fn [_] (http/ok))
+        app ((auth/require-role :admin) handler)
+        resp (app {:identity {:claims {:roles [:admin :user]}}})]
+    (is (= 200 (:status resp)))))
+
+(deftest role-guard-failure
+  (let [handler (fn [_] (http/ok))
+        app ((auth/require-role :admin) handler)
+        resp (app {:identity {:claims {:roles [:user]}}})]
+    (is (= 403 (:status resp)))))
+
