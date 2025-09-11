@@ -1,6 +1,9 @@
 (ns etlp-mapper.auth
-  "Ring middleware for validating Keycloak OIDC access tokens."
+  "Ring middleware for validating Keycloak OIDC access tokens and
+  enriching the request with database backed user and organization
+  context."
   (:require [cheshire.core :as json]
+            [clojure.java.jdbc :as jdbc]
             [clojure.string :as str]
             [ring.util.http-response :as http])
   (:import (com.auth0.jwt JWT)
@@ -57,14 +60,33 @@
                            .build)]
           (.verify verifier token))))))
 
+(defn- upsert-user!
+  "Insert or update a user record and return the stored row."
+  [db {:keys [idp-sub email name]}]
+  (first
+   (jdbc/query db
+               ["insert into users as u (idp_sub,email,name) values (?,?,?) "
+                "on conflict (idp_sub) do update set email=excluded.email, name=excluded.name "
+                "returning u.id, u.email, u.idp_sub, u.last_used_org_id"
+                idp-sub email name])))
+
+(defn- update-last-org!
+  [db user-id org-id]
+  (jdbc/execute! db ["update users set last_used_org_id=? where id=?" org-id user-id]))
+
+(defn- load-user-roles
+  [db user-id org-id]
+  (map :role
+       (jdbc/query db ["select role from organization_members where user_id=? and org_id=?" user-id org-id])))
+
 (defn wrap-auth
   "Middleware factory that validates bearer tokens and attaches an
   `:identity` map to the request on success.
 
-  Options: `:issuer`, `:audience`, `:jwks-uri`.  For testing a custom
-  `:verifier` function may be supplied which should return a
+  Options: `:issuer`, `:audience`, `:jwks-uri`, `:db`.  For testing a
+  custom `:verifier` function may be supplied which should return a
   `DecodedJWT` when given a token."
-  [{:keys [issuer audience jwks-uri verifier]}]
+  [{:keys [issuer audience jwks-uri verifier db]}]
   (let [verify (or verifier (build-verifier issuer audience jwks-uri))]
     (fn [handler]
       (fn [req]
@@ -72,13 +94,30 @@
           (try
             (let [decoded (verify token)
                   claims  (decode-claims decoded)
-                  org-id  (:org_id claims)
-                  identity {:method :oidc
+                  idp-sub (:sub claims)
+                  email   (:email claims)
+                  name    (:name claims)
+                  user    (upsert-user! db {:idp-sub idp-sub :email email :name name})
+                  req-org (get-in req [:headers "x-org-id"])
+                  org-id  (or req-org (:last_used_org_id user))
+                  _       (when req-org (update-last-org! db (:id user) org-id))
+                  roles   (let [token-roles (:roles claims)]
+                            (if (seq token-roles)
+                              (set (map keyword token-roles))
+                              (if (and org-id (:id user))
+                                (->> (load-user-roles db (:id user) org-id)
+                                     (map keyword)
+                                     set)
+                                #{})))
+                  identity {:user {:id (:id user)
+                                   :email (:email user)
+                                   :idp-sub (:idp_sub user)}
                             :org/id org-id
-                            :claims claims}
+                            :roles roles}
                   resp    (handler (assoc req :identity identity))]
               (assoc resp :identity identity))
             (catch Exception _
+              (println _)
               (unauthorized "Invalid token")))
           (unauthorized "Invalid token"))))))
 
@@ -94,13 +133,13 @@
 
 (defn require-role
   "Middleware factory enforcing that the authenticated identity has the
-  given role inside a `roles` claim."
+  given role, using roles resolved from the database."
   [role]
   (fn [handler]
     (fn [req]
-      (let [roles (get-in req [:identity :claims :roles])
-            role-str (name role)]
-        (if (some #{role role-str} roles)
+      (let [roles (get-in req [:identity :roles])
+            role  (keyword role)]
+        (if (contains? roles role)
           (handler req)
           (forbidden "Insufficient role"))))))
 

@@ -25,7 +25,7 @@
             "clj-kondo-lint" ["do" ["clj-kondo-deps"] ["with-profile" "+test" "clj-kondo"]]}
   :main ^:skip-aot etlp-mapper.main
   :resource-paths ["resources" "target/resources"]
-  :prep-tasks     ["javac" "compile" ["run" ":duct/compiler"]]
+  :prep-tasks     ["javac" "compile"]
   :middleware     [lein-duct.plugin/middleware]
   :profiles
   {:dev           [:project/dev :profiles/dev]

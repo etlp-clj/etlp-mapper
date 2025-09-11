@@ -6,10 +6,11 @@
   [_ _]
   (fn [request]
     (let [claims (get-in request [:identity :claims])
-          org-id (get-in request [:identity :org/id])]
-      [::response/ok {:org_id org-id
-                      :sub (:sub claims)
-                      :email (:email claims)
-                      :exp (:exp claims)
+          org-id (get-in request [:identity :org/id])
+          user   {:sub   (:sub claims)
+                  :email (:email claims)
+                  :exp   (:exp claims)}]
+      [::response/ok {:user   user
+                      :org_id org-id
                       :roles (:roles claims)}])))
 

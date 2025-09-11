@@ -31,7 +31,7 @@ $  java -jar target/etlp-mapper-0.1.0-SNAPSHOT-standalone.jar
 
 ```
 
-The migrations create organization-aware `mappings` and `mappings_history` tables, each keyed by an `org_id` used to scope data per tenant. Existing deployments can apply the new migrations to add these columns without dropping data.
+The migrations create organization-aware `mappings` and `mappings_history` tables, each keyed by an `organization_id` used to scope data per tenant.
 
 
 

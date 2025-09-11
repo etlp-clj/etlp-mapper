@@ -32,25 +32,36 @@
     {:token token :verifier verifier}))
 
 (deftest jwt-success
-  (let [{:keys [token verifier]} (gen-token {:org_id "org-1"})
+  (let [{:keys [token verifier]} (gen-token {:sub "sub-1" :email "u@example" :name "User"})
         handler (fn [req] (http/ok (get req :identity)))
-        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier})
-             ((auth/wrap-require-org) handler))
-        resp (app {:headers {"authorization" (str "Bearer " token)}})]
-    (is (= 200 (:status resp)))
-    (is (= "org-1" (get-in resp [:body :org/id])))))
+        upsert (fn [_ _] {:id 1 :email "u@example" :idp_sub "sub-1" :last_used_org_id nil})
+        roles  (fn [_ _ _] ["admin"])]
+    (with-redefs [auth/upsert-user! upsert
+                  auth/load-user-roles roles
+                  auth/update-last-org! (fn [_ _ _])]
+      (let [app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier :db ::db})
+                 ((auth/wrap-require-org) handler))
+            resp (app {:headers {"authorization" (str "Bearer " token)
+                                 "x-org-id" "org-1"}})]
+        (is (= 200 (:status resp)))
+        (is (= "org-1" (get-in resp [:body :org/id])))
+        (is (= #{:admin} (get-in resp [:body :roles])))))))
 
 (deftest jwt-missing-org
-  (let [{:keys [token verifier]} (gen-token {})
+  (let [{:keys [token verifier]} (gen-token {:sub "s" :email "e" :name "n"})
         called (atom false)
         handler (fn [_]
                   (reset! called true)
                   (http/ok))
-        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier})
-             ((auth/wrap-require-org) handler))
-        resp (app {:headers {"authorization" (str "Bearer " token)}})]
-    (is (= 403 (:status resp)))
-    (is (false? @called))))
+        upsert (fn [_ _] {:id 1 :email "e" :idp_sub "s" :last_used_org_id nil})]
+    (with-redefs [auth/upsert-user! upsert
+                  auth/load-user-roles (fn [& _] [])
+                  auth/update-last-org! (fn [_ _ _])]
+      (let [app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier :db ::db})
+                 ((auth/wrap-require-org) handler))
+            resp (app {:headers {"authorization" (str "Bearer " token)}})]
+        (is (= 403 (:status resp)))
+        (is (false? @called))))))
 
 (deftest jwt-invalid
   (let [{:keys [token]} (gen-token {:org_id "org-1"})
