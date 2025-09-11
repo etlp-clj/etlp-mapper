@@ -65,7 +65,7 @@
           (println e)
           [::response/bad-request {:error (str e)}])))))
 
-(defmethod ig/init-key :etlp-mapper.handler/mappings [_ {:keys [db]}]
+(defmethod ig/init-key :etlp-mapper.handler.mappings [_ {:keys [db]}]
   (fn [request]
     (let [org-id (get-in request [:identity :org/id])
           user-id (get-in request [:identity :claims :sub])]

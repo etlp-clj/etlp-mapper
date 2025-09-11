@@ -20,7 +20,7 @@
             [:etlp-mapper.handler/apply-mappings ^int id data]
 
             [:post "/mappings/test"]
-            [:etlp-mapper.handler/mappings]
+            [:etlp-mapper.handler.mappings]
 
             [:get    "/mappings/" id] [:etlp-mapper.handler.mappings/find ^int id]
             [:get    "/mappings/" id "/_history"] [:etlp-mapper.handler.mappings/history ^int id]
@@ -199,8 +199,7 @@ $$ LANGUAGE plpgsql;"]
  ;:etlp-mapper/etlp {}
 
 
- :etlp-mapper.auth-component/require-org {}
- :etlp-mapper.auth-component/require-role {:role :editor}
+
 
  :duct.profile/dev   #duct/include "dev"
  :duct.profile/prod  #duct/include "prod.edn"
