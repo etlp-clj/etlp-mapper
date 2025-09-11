@@ -110,6 +110,15 @@ defaults in the development configuration:
 | `OIDC_AUDIENCE` | `mapify-api` | Expected audience of issued tokens |
 | `OIDC_JWKS_URI` | `http://localhost:8080/realms/mapify/protocol/openid-connect/certs` | JWKS endpoint for token verification |
 
+### Invite Tokens
+
+Configure HMAC invite tokens with:
+
+```
+APP_SECRET=<your-secret>
+INVITE_TTL_DAYS=7
+```
+
 Run tests (if Leiningen is installed) with:
 
 ```sh

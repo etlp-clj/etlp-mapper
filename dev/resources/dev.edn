@@ -9,4 +9,10 @@
   :audience #duct/env ["OIDC_AUDIENCE" :or "mapify-api"]
   :jwks-uri #duct/env ["OIDC_JWKS_URI" :or "http://localhost:8080/realms/mapify/protocol/openid-connect/certs"]}
 
- :etlp-mapper.auth-component/require-org {}}
+ :etlp-mapper.auth-component/require-org {}
+
+ :etlp-mapper.auth-component/require-role {}
+
+ :etlp-mapper.invite/token
+ {:app-secret #duct/env ["APP_SECRET" :or "dev-secret"]
+  :invite-ttl-days #duct/env ["INVITE_TTL_DAYS" :or 7]}}

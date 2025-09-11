@@ -193,14 +193,15 @@ $$ LANGUAGE plpgsql;"]
   [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/traverse-history]
   {:request {[_ id version] :ataraxy/result
              {org-id :org/id} :identity}
-   :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND mh.txnid = ? AND m.organization_id = ? AND mh.organization_id = ?::uuid" id version org-id org-id]}}
-
+   :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND mh.txnid = ? AND m.organization_id = ? AND mh.organization_id = ?::uuid" id version org-id org-id]}
+  
+  :etlp-mapper.invite/token {}
   :etlp-mapper.auth-component/require-org {}
   :etlp-mapper.auth-component/require-role {:role :editor}
 
  :duct.profile/dev   #duct/include "dev"
- ; :duct.profile/local #duct/include "local"
- :duct.profile/prod  #duct/include "prod.edn"
+  ; :duct.profile/local #duct/include "local"
+  :duct.profile/prod  #duct/include "prod.edn"
 
  :duct.module/logging {}
  :duct.module.web/api {}
