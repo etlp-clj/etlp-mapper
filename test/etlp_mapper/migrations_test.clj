@@ -17,12 +17,10 @@
 
 (deftest migrations-enforce-org-id
   (let [base (:duct.profile/base config)
-        sql1 (get base [:duct.migrator.ragtime/sql :etlp-mapper.migration/add-org-id-to-mappings])
-        sql2 (get base [:duct.migrator.ragtime/sql :etlp-mapper.migration/add-org-id-to-mappings-history])
+        sql1 (get base [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-mappings])
+        sql2 (get base [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-mappings-history])
         up1 (:up sql1)
         up2 (:up sql2)]
-    (is (some #(re-find #"ALTER TABLE mappings ADD COLUMN org_id" %) up1))
-    (is (some #(re-find #"ALTER TABLE mappings ALTER COLUMN org_id SET NOT NULL" %) up1))
-    (is (some #(re-find #"ALTER TABLE mappings_history ADD COLUMN org_id" %) up2))
-    (is (some #(re-find #"ALTER TABLE mappings_history ALTER COLUMN org_id SET NOT NULL" %) up2))))
+    (is (some #(re-find #"organization_id UUID NOT NULL" %) up1))
+    (is (some #(re-find #"organization_id UUID NOT NULL" %) up2))))
 

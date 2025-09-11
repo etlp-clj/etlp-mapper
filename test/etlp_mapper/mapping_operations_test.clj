@@ -8,12 +8,12 @@
 
 (deftest mapping-create-requires-role
   (let [app ((auth/require-role :mapper) create-handler)
-        resp (app {:identity {:org/id "org-1" :claims {:roles [:mapper]}}})]
+        resp (app {:identity {:org/id "org-1" :roles #{:mapper}}})]
     (is (= 200 (:status resp)))
     (is (= "org-1" (get-in resp [:body :org/id])))))
 
 (deftest mapping-create-role-forbidden
   (let [app ((auth/require-role :mapper) create-handler)
-        resp (app {:identity {:org/id "org-1" :claims {:roles [:viewer]}}})]
+        resp (app {:identity {:org/id "org-1" :roles #{:viewer}}})]
     (is (= 403 (:status resp)))))
 

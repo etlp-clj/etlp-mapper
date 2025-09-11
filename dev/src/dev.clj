@@ -14,7 +14,9 @@
 (duct/load-hierarchy)
 
 (defn read-config []
-  (duct/read-config (io/resource "etlp_mapper/config.edn")))
+  (-> (io/resource "etlp_mapper/config.edn")
+      duct/read-config
+      ig/load-namespaces))
 
 (defn test []
   (eftest/run-tests (eftest/find-tests "test")))
