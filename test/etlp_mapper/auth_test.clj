@@ -82,6 +82,18 @@
     (is (= 401 (:status resp)))
     (is (= "Bearer realm=\"mapify\"" (get-in resp [:headers "WWW-Authenticate"])))) )
 
+(deftest jwt-db-error
+  (let [{:keys [token verifier]} (gen-token {:sub "s" :email "e" :name "n"})
+        handler (fn [_] (http/ok))
+        failing-upsert (fn [_ _] (throw (IllegalArgumentException. "db-spec null is missing a required parameter")))]
+    (with-redefs [auth/upsert-user! failing-upsert
+                  auth/load-user-roles (fn [& _] [])
+                  auth/update-last-org! (fn [& _] nil)]
+      (let [app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier :db nil}) handler)
+            resp (app {:headers {"authorization" (str "Bearer " token)}})]
+        (is (= 500 (:status resp)))
+        (is (= "db-spec null is missing a required parameter" (get-in resp [:body :error])))))))
+
 (deftest route-protection
   (let [handler (fn [_] (http/ok))
         app ((auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil)})
