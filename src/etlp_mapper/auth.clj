@@ -61,9 +61,10 @@
                            .build)]
           (.verify verifier token))))))
 
+
 (defn- upsert-user!
   "Insert or update a user record and return the stored row."
-  [db {:keys [idp-sub email name]}]
+  [{db :spec} {:keys [idp-sub email name]}]
   (first
    (jdbc/query db
                ["insert into users as u (idp_sub,email,name) values (?,?,?) "
@@ -71,12 +72,14 @@
                 "returning u.id, u.email, u.idp_sub, u.last_used_org_id"
                 idp-sub email name])))
 
+
 (defn- update-last-org!
-  [db user-id org-id]
+  [{db :spec} user-id org-id]
   (jdbc/execute! db ["update users set last_used_org_id=? where id=?" org-id user-id]))
 
+
 (defn- load-user-roles
-  [db user-id org-id]
+  [{db :spec} user-id org-id]
   (map :role
        (jdbc/query db ["select role from organization_members where user_id=? and organization_id=?" user-id org-id])))
 
