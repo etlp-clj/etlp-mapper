@@ -54,7 +54,7 @@
    :down ["DROP TABLE organizations;"]}
 
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-users]
-  {:up ["CREATE TABLE users (id UUID PRIMARY KEY, email TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP); CREATE UNIQUE INDEX users_email_idx ON users(email);"]
+  {:up ["CREATE TABLE users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), idp_sub TEXT NOT NULL UNIQUE, email TEXT NOT NULL, name TEXT, last_used_org_id UUID REFERENCES organizations(id), created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP); CREATE UNIQUE INDEX users_email_idx ON users(email);"]
    :down ["DROP TABLE users;"]}
 
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-organization-members]

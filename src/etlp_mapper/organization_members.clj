@@ -18,17 +18,17 @@
 (extend-protocol OrganizationMembers
   duct.database.sql.Boundary
   (find-members [{db :spec} org-id]
-    (jdbc/query db ["select * from organization_members where org_id = ?" org-id]))
+    (jdbc/query db ["select * from organization_members where organization_id = ?" org-id]))
   (add-member [{db :spec} data]
     (first (jdbc/insert! db :organization_members data)))
   (remove-member [{db :spec} org-id user-id]
-    (jdbc/delete! db :organization_members ["org_id = ? and user_id = ?" org-id user-id]))
+    (jdbc/delete! db :organization_members ["organization_id = ? and user_id = ?" org-id user-id]))
   (member? [{db :spec} org-id user-id]
-    (-> (jdbc/query db ["select 1 from organization_members where org_id = ? and user_id = ? limit 1" org-id user-id])
+    (-> (jdbc/query db ["select 1 from organization_members where organization_id = ? and user_id = ? limit 1" org-id user-id])
         empty?
         not))
   (has-role? [{db :spec} org-id user-id role]
-    (-> (jdbc/query db ["select 1 from organization_members where org_id = ? and user_id = ? and role = ? limit 1" org-id user-id role])
+    (-> (jdbc/query db ["select 1 from organization_members where organization_id = ? and user_id = ? and role = ? limit 1" org-id user-id role])
         empty?
         not)))
 

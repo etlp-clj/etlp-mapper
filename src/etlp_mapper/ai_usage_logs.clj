@@ -16,7 +16,7 @@
   (find-usage [{db :spec} id]
     (first (jdbc/query db ["select * from ai_usage_logs where id = ?" id])))
   (find-usage-for-org [{db :spec} org-id]
-    (jdbc/query db ["select * from ai_usage_logs where org_id = ?" org-id]))
+    (jdbc/query db ["select * from ai_usage_logs where organization_id = ?" org-id]))
   (log-usage [{db :spec} data]
     (first (jdbc/insert! db :ai_usage_logs data))))
 
@@ -25,7 +25,7 @@
   "Insert a new AI usage log entry. Accepts a database boundary and a map with
   :org-id, :user-id, :feature-type, :input-tokens and :output-tokens."
   [db {:keys [org-id user-id feature-type input-tokens output-tokens]}]
-  (log-usage db {:org_id org-id
+  (log-usage db {:organization_id org-id
                  :user_id user-id
                  :feature_type feature-type
                  :input_tokens input-tokens
