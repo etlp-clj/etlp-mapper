@@ -9,6 +9,7 @@
   (:import (com.auth0.jwt JWT)
            (com.auth0.jwt.algorithms Algorithm)
            (com.auth0.jwk JwkProviderBuilder)
+           (com.auth0.jwt.exceptions JWTVerificationException)
            (java.net URL)
            (java.nio.charset StandardCharsets)
            (java.util Base64)
@@ -116,9 +117,11 @@
                             :roles roles}
                   resp    (handler (assoc req :identity identity))]
               (assoc resp :identity identity))
-            (catch Exception _
-              (println _)
-              (unauthorized "Invalid token")))
+            (catch JWTVerificationException _
+              (unauthorized "Invalid token"))
+            (catch Exception e
+              (println e)
+              (http/internal-server-error {:error (.getMessage e)})))
           (unauthorized "Invalid token"))))))
 
 (defn wrap-require-org
