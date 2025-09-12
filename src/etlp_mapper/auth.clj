@@ -78,7 +78,7 @@
 (defn- load-user-roles
   [db user-id org-id]
   (map :role
-       (jdbc/query db ["select role from organization_members where user_id=? and org_id=?" user-id org-id])))
+       (jdbc/query db ["select role from organization_members where user_id=? and organization_id=?" user-id org-id])))
 
 (defn wrap-auth
   "Middleware factory that validates bearer tokens and attaches an
@@ -88,6 +88,8 @@
   custom `:verifier` function may be supplied which should return a
   `DecodedJWT` when given a token."
   [{:keys [issuer audience jwks-uri verifier db]}]
+  (when (nil? db)
+    (throw (ex-info "Database connection must be configured" {})))
   (let [verify (or verifier (build-verifier issuer audience jwks-uri))]
     (fn [handler]
       (fn [req]

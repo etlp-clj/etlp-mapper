@@ -76,7 +76,7 @@
                              .build
                              (.verify t))))
         handler (fn [_] (http/ok))
-        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier bad-verifier})
+        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier bad-verifier :db ::db})
              ((auth/wrap-require-org) handler))
         resp (app {:headers {"authorization" (str "Bearer " token)}})]
     (is (= 401 (:status resp)))
@@ -89,14 +89,14 @@
     (with-redefs [auth/upsert-user! failing-upsert
                   auth/load-user-roles (fn [& _] [])
                   auth/update-last-org! (fn [& _] nil)]
-      (let [app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier :db nil}) handler)
+      (let [app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier :db ::db}) handler)
             resp (app {:headers {"authorization" (str "Bearer " token)}})]
         (is (= 500 (:status resp)))
         (is (= "db-spec null is missing a required parameter" (get-in resp [:body :error])))))))
 
 (deftest route-protection
   (let [handler (fn [_] (http/ok))
-        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil)})
+        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil) :db ::db})
              ((auth/wrap-require-org) handler))
         resp (app {})]
     (is (= 401 (:status resp)))))
@@ -104,7 +104,12 @@
 (deftest jwks-uri-required
   (is (thrown-with-msg? clojure.lang.ExceptionInfo
                         #"JWKS URI must be configured"
-                        (auth/wrap-auth {:issuer issuer :audience audience}))))
+                        (auth/wrap-auth {:issuer issuer :audience audience :db ::db}))))
+
+(deftest db-required
+  (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                        #"Database connection must be configured"
+                        (auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil)}))))
 
 
 (deftest role-guard-success
