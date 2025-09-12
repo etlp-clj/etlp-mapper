@@ -67,9 +67,9 @@
   [{db :spec} {:keys [idp-sub email name]}]
   (first
    (jdbc/query db
-               ["insert into users as u (idp_sub,email,name) values (?,?,?) "
-                "on conflict (idp_sub) do update set email=excluded.email, name=excluded.name "
-                "returning u.id, u.email, u.idp_sub, u.last_used_org_id"
+               [(str "insert into users as u (idp_sub,email,name) values (?,?,?) "
+                     "on conflict (idp_sub) do update set email=excluded.email, name=excluded.name "
+                     "returning u.id, u.email, u.idp_sub, u.last_used_org_id")
                 idp-sub email name])))
 
 

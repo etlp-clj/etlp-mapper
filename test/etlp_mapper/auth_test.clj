@@ -1,5 +1,6 @@
 (ns etlp-mapper.auth-test
   (:require [clojure.test :refer :all]
+            [clojure.java.jdbc :as jdbc]
             [etlp-mapper.auth :as auth]
             [ring.util.http-response :as http])
   (:import (java.security KeyPairGenerator)
@@ -123,4 +124,14 @@
         app ((auth/require-role :admin) handler)
         resp (app {:identity {:roles #{:user}}})]
     (is (= 403 (:status resp)))))
+
+(deftest upsert-user-sql-params
+  (let [captured (atom nil)
+        expected-row {:id 1 :email "e" :idp_sub "s" :last_used_org_id nil}
+        expected-sql (str "insert into users as u (idp_sub,email,name) values (?,?,?) "
+                          "on conflict (idp_sub) do update set email=excluded.email, name=excluded.name "
+                          "returning u.id, u.email, u.idp_sub, u.last_used_org_id")]
+    (with-redefs [jdbc/query (fn [_ v] (reset! captured v) [expected-row])]
+      (is (= expected-row (@#'auth/upsert-user! {:spec ::db} {:idp-sub "s" :email "e" :name "n"})))
+      (is (= [expected-sql "s" "e" "n"] @captured)))))
 
