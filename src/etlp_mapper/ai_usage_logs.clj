@@ -33,11 +33,13 @@
 
 (defn log!
   "Insert a new AI usage log entry. Accepts a database boundary and a map with
-  :org-id, :user-id, :feature-type, :input-tokens and :output-tokens."
+  :org-id, :user-id, :feature-type, :input-tokens and :output-tokens.  When the
+  token counts are omitted they default to zero so callers don't need to
+  provide placeholder values."
   [db {:keys [org-id user-id feature-type input-tokens output-tokens]}]
   (log-usage db {:organization_id org-id
                  :user_id user-id
                  :feature_type feature-type
-                 :input_tokens input-tokens
-                 :output_tokens output-tokens}))
+                 :input_tokens (or input-tokens 0)
+                 :output_tokens (or output-tokens 0)}))
 

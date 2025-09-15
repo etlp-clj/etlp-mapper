@@ -2,7 +2,8 @@
   (:require [ataraxy.response :as response]
             [integrant.core :as ig]
             [etlp-mapper.audit-logs :as audit-logs]
-            [etlp-mapper.identity :as identity]))
+            [etlp-mapper.identity :as identity]
+            [etlp-mapper.ai-usage-logs :as ai-usage-logs]))
 
 (defn- admin-role? [roles]
   (some #{:owner :admin} roles))
@@ -27,6 +28,11 @@
                                :user-id user-id
                                :action "create-invite"
                                :context {:token token}})
+          (ai-usage-logs/log! db {:org-id org-id
+                                  :user-id user-id
+                                  :feature-type "invite"
+                                  :input-tokens 0
+                                  :output-tokens 0})
           [::response/ok {:org_id org-id :token token}])
         :else
         [::response/forbidden {:error "Insufficient role"}]))))
@@ -53,4 +59,10 @@
                                :user-id user-id
                                :action "accept-invite"
                                :context {:token token}})
-          [::response/ok {:org_id org-id :token token :status "accepted"}])))))
+          (ai-usage-logs/log! db {:org-id org_id
+                                  :user-id user-id
+                                  :feature-type "invite"
+                                  :input-tokens 0
+                                  :output-tokens 0})
+          [::response/ok {:org_id org_id :token token :status "accepted"}])
+        [::response/bad-request {:error "Invalid token"}]))))
