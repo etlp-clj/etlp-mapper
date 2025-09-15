@@ -153,6 +153,11 @@
                               :identity {:org/id "org-1"
                                          :roles #{:admin}
                                          :user {:id "user-1"}}}))))
+    (testing "create invite rejects missing user context"
+      (is (= [::response/forbidden {:error "User context required"}]
+             (create-handler {:ataraxy/result [::create "org-1"]
+                              :identity {:org/id "org-1"
+                                         :roles #{:admin}}}))))
     (testing "create invite rejects callers without admin role"
       (is (= [::response/forbidden {:error "Insufficient role"}]
              (create-handler {:ataraxy/result [::create "org-1"]
@@ -189,6 +194,10 @@
              (accept-handler {:body-params {:org_id "org-1"}
                               :identity {:org/id "org-1"
                                          :user {:id "user-1"}}}))))
+    (testing "accept invite rejects missing user context"
+      (is (= [::response/forbidden {:error "User context required"}]
+             (accept-handler {:body-params {:token "tok-1" :org_id "org-1"}
+                              :identity {:org/id "org-1"}}))))
     (testing "accept invite logs within the active organization"
       (let [logged (atom nil)
             [status body] (with-redefs [audit-logs/log! (fn [_ entry] (reset! logged entry))]
