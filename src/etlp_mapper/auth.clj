@@ -125,7 +125,8 @@
                                    :email (:email user)
                                    :idp-sub (:idp_sub user)}
                             :org/id org-id
-                            :roles roles}
+                            :roles roles
+                            :claims claims}
                   resp    (handler (assoc req :identity identity))]
               (assoc resp :identity identity))
             (catch JWTVerificationException _

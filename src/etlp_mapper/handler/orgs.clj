@@ -14,7 +14,7 @@
     (if (get-in request [:identity :org/id])
       [::response/forbidden {:error "Organization already selected"}]
       (let [new-id (str (java.util.UUID/randomUUID))
-            user-id (get-in request [:identity :claims :sub])]
+            user-id (get-in request [:identity :user :id])]
         (audit-logs/log! db {:org-id new-id
                              :user-id user-id
                              :action "create-organization"})

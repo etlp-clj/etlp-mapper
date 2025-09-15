@@ -12,10 +12,10 @@
 (defmethod ig/init-key :etlp-mapper.handler.invites/create
   [_ {:keys [db]}]
   (fn [{[_ org-id] :ataraxy/result :as request}]
-    (let [roles (get-in request [:identity :claims :roles])]
+    (let [roles (get-in request [:identity :roles])]
       (if (admin-role? roles)
         (let [token (str (java.util.UUID/randomUUID))
-              user-id (get-in request [:identity :claims :sub])]
+              user-id (get-in request [:identity :user :id])]
           (audit-logs/log! db {:org-id org-id
                                :user-id user-id
                                :action "create-invite"
@@ -30,7 +30,7 @@
 (defmethod ig/init-key :etlp-mapper.handler.invites/accept
   [_ {:keys [db]}]
   (fn [{{:keys [token org_id]} :body-params :as request}]
-    (let [user-id (get-in request [:identity :claims :sub])]
+    (let [user-id (get-in request [:identity :user :id])]
       (if token
         (do
           (audit-logs/log! db {:org-id org_id
