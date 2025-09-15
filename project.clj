@@ -20,7 +20,8 @@
                  [org.postgresql/postgresql "42.2.19"]]
   :plugins [[duct/lein-duct "0.12.3"]
             [lein-cloverage "1.2.2"]
-            [com.github.clj-kondo/lein-clj-kondo "0.2.5"]]
+            [com.github.clj-kondo/lein-clj-kondo "0.2.5"]
+            [lein-eftest "0.5.9"]]
   :aliases {"clj-kondo-deps" ["with-profile" "+test" "clj-kondo" "--copy-configs" "--dependencies" "--parallel" "--lint" "$classpath"]
             "clj-kondo-lint" ["do" ["clj-kondo-deps"] ["with-profile" "+test" "clj-kondo"]]}
   :main ^:skip-aot etlp-mapper.main
