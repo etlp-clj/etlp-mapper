@@ -5,8 +5,8 @@
             [etlp-mapper.ai-usage-logs :as ai-usage-logs]))
 
 ;; POST /me/active-org – set the currently active organisation for the user.
-;; The real implementation would persist this choice and perhaps issue a new
-;; token.  Here we simply echo back the requested organisation identifier.
+;; Validates that the authenticated user is a member of the organisation and
+;; persists the choice by updating `users.last_used_org_id`.
 (defmethod ig/init-key :etlp-mapper.handler.me/set-active-org
   [_ {:keys [db]}]
   (fn [{{:keys [org_id]} :body-params :as request}]

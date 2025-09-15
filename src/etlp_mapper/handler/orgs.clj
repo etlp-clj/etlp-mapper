@@ -12,7 +12,7 @@
 (defmethod ig/init-key :etlp-mapper.handler.orgs/create
   [_ {:keys [db]}]
   (fn [request]
-    (if (get-in request [:identity :org/id])
+    (if (identity/org-id request)
       [::response/forbidden {:error "Organization already selected"}]
       (let [new-id (str (java.util.UUID/randomUUID))
             user-id (get-in request [:identity :claims :sub])]
@@ -25,4 +25,3 @@
                                 :input-tokens 0
                                 :output-tokens 0})
         [::response/ok {:org_id new-id}]))))
-

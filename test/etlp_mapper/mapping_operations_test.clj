@@ -11,15 +11,16 @@
 (defn create-handler [req]
   (http/ok {:org/id (get-in req [:identity :org/id])}))
 
+
 (deftest mapping-create-requires-role
-  (let [app ((auth/require-role :mapper) create-handler)
-        resp (app {:identity {:org/id "org-1" :roles #{:mapper}}})]
+  (let [app ((auth/require-role :editor) create-handler)
+        resp (app {:identity {:org/id "org-1" :roles #{:editor}}})]
     (is (= 200 (:status resp)))
     (is (= "org-1" (get-in resp [:body :org/id])))))
 
 (deftest mapping-create-role-forbidden
-  (let [app ((auth/require-role :mapper) create-handler)
-        resp (app {:identity {:org/id "org-1" :roles #{:viewer}}})]
+  (let [app ((auth/require-role :editor) create-handler)
+        resp (app {:identity {:org/id "org-1" :roles #{:admin}}})]
     (is (= 403 (:status resp)))))
 
 (deftest mapping-lifecycle-logs

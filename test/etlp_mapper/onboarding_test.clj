@@ -41,4 +41,3 @@
                  (map :feature-type ai-events)))
           (is (every? zero? (map :input-tokens ai-events)))
           (is (every? zero? (map :output-tokens ai-events))))))))
-
