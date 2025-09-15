@@ -74,8 +74,14 @@
 
 
 (defn- update-last-org!
+  "Update the user's `last_used_org_id` only if the organization exists.
+
+  This prevents violating the `users_last_used_org_id_fkey` when a user
+  provides an organization identifier that isn't present in the
+  `organizations` table."
   [{db :spec} user-id org-id]
-  (jdbc/execute! db ["update users set last_used_org_id=? where id=?" org-id user-id]))
+  (when (seq (jdbc/query db ["select 1 from organizations where id=?" org-id]))
+    (jdbc/execute! db ["update users set last_used_org_id=? where id=?" org-id user-id])))
 
 
 (defn- load-user-roles
@@ -120,7 +126,8 @@
                                    :idp-sub (:idp_sub user)
                                    :last-used-org-id (:last_used_org_id user)}
                             :org/id org-id
-                            :roles roles}
+                            :roles roles
+                            :claims claims}
                   resp    (handler (assoc req :identity identity))]
               (assoc resp :identity identity))
             (catch JWTVerificationException _

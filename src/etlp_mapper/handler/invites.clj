@@ -6,10 +6,8 @@
 
 (defn- admin-role? [roles]
   (some #{:owner :admin} roles))
-
 ;; POST /orgs/:org-id/invites – create an invite token.  Requires the caller to
-;; have an admin or owner role within the organisation.  Token generation and
-;; persistence are stubbed out.
+;; have an admin role within the organisation.
 (defmethod ig/init-key :etlp-mapper.handler.invites/create
   [_ {:keys [db]}]
   (fn [{[_ path-org] :ataraxy/result :as request}]
@@ -33,10 +31,8 @@
         :else
         [::response/forbidden {:error "Insufficient role"}]))))
 
-;; POST /invites/accept – accept an invite token.  In a full system the token
-;; would be validated and the user added to the organisation along with an
-;; audit entry.  Here we simply echo back the token and supplied organisation
-;; identifier.
+;; POST /invites/accept – verify an invite token and add the user to the
+;; organisation membership list.
 (defmethod ig/init-key :etlp-mapper.handler.invites/accept
   [_ {:keys [db]}]
   (fn [{{:keys [token org_id]} :body-params :as request}]

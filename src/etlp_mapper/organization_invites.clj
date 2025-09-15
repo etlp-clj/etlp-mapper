@@ -66,3 +66,4 @@
   (consume-invite [{db :spec} org-id token]
     (consume-invite* db org-id token)))
 
+
