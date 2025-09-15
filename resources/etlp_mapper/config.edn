@@ -2,33 +2,36 @@
  {:duct.core/project-ns etlp-mapper
 
   :duct.router/ataraxy
-  {:routes {[:get "/"] [:etlp-mapper.handler/index]
+  {:middleware {:editor        #ig/ref :etlp-mapper.auth-component/require-editor
+                :admin         #ig/ref :etlp-mapper.auth-component/require-admin
+                :owner         #ig/ref :etlp-mapper.auth-component/require-owner
+                :admin-or-owner #ig/ref :etlp-mapper.auth-component/require-admin-or-owner}
+   :routes {[:get "/"] [:etlp-mapper.handler/index]
             [:get "/whoami"] [:etlp-mapper.handler/whoami]
-            [:post "/orgs"] [:etlp-mapper.handler.orgs/create]
-            [:post "/orgs/" org-id "/invites"] [:etlp-mapper.handler.invites/create org-id]
+            [:post "/orgs"] ^:owner [:etlp-mapper.handler.orgs/create]
+            [:post "/orgs/" org-id "/invites"] ^:admin-or-owner [:etlp-mapper.handler.invites/create org-id]
             [:post "/invites/accept"] [:etlp-mapper.handler.invites/accept]
-            [:post "/me/active-org"] [:etlp-mapper.handler.me/set-active-org]
-            [:post "/billing/portal"] [:etlp-mapper.handler.billing/portal]
-            [:get "/mappings"] [:etlp-mapper.handler.mappings/list]
+            [:post "/me/active-org"] ^:admin [:etlp-mapper.handler.me/set-active-org]
+            [:post "/billing/portal"] ^:admin-or-owner [:etlp-mapper.handler.billing/portal]
+            [:get "/mappings"] ^:editor [:etlp-mapper.handler.mappings/list]
             [:post "/mappings" {{:keys [title content]} :body-params}]
-            [:etlp-mapper.handler.mappings/create title content]
+            ^:editor [:etlp-mapper.handler.mappings/create title content]
 
             [:put "/mappings/" id {{:keys [content]} :body-params}]
-            [:etlp-mapper.handler.mappings/update ^int id content]
+            ^:editor [:etlp-mapper.handler.mappings/update ^int id content]
 
             [:post "/mappings/" id "/apply" {{:keys [data]} :body-params}]
-            [:etlp-mapper.handler/apply-mappings ^int id data]
+            ^:editor [:etlp-mapper.handler/apply-mappings ^int id data]
 
             [:post "/mappings/test"]
-            [:etlp-mapper.handler.mappings]
+            ^:editor [:etlp-mapper.handler.mappings]
 
-            [:get    "/mappings/" id] [:etlp-mapper.handler.mappings/find ^int id]
-            [:get    "/mappings/" id "/_history"] [:etlp-mapper.handler.mappings/history ^int id]
-            [:get    "/mappings/" id "/_history/" version] [:etlp-mapper.handler.mappings/traverse-history ^int id version]
-            [:delete "/mappings/" id] [:etlp-mapper.handler.mappings/destroy ^int id]}}
+            [:get    "/mappings/" id] ^:editor [:etlp-mapper.handler.mappings/find ^int id]
+            [:get    "/mappings/" id "/_history"] ^:editor [:etlp-mapper.handler.mappings/history ^int id]
+            [:get    "/mappings/" id "/_history/" version] ^:editor [:etlp-mapper.handler.mappings/traverse-history ^int id version]
+            [:delete "/mappings/" id] ^:editor [:etlp-mapper.handler.mappings/destroy ^int id]}}
 
   :duct.handler/root {:middleware [#ig/ref :etlp-mapper.auth-component/require-org
-                                   #ig/ref :etlp-mapper.auth-component/require-role
                                    #ig/ref :etlp-mapper.auth-component/auth
                                    #ig/ref :etlp-mapper.middlewares/cors]}
 
@@ -133,6 +136,10 @@ $$ LANGUAGE plpgsql;"]
    :sql ["SELECT * FROM mappings WHERE organization_id = ?::uuid" org-id]
    :hrefs {:href "/mappings/{id}"}}
 
+  :etlp-mapper.auth-component/require-owner {}
+  :etlp-mapper.auth-component/require-admin {}
+  :etlp-mapper.auth-component/require-editor {}
+  :etlp-mapper.auth-component/require-admin-or-owner {}
   :etlp-mapper.middlewares/cors
   {}
 

@@ -3,25 +3,18 @@
             [integrant.core :as ig]
             [etlp-mapper.audit-logs :as audit-logs]))
 
-(defn- admin-role? [roles]
-  (some #{:owner "owner" :admin "admin"} roles))
-
-;; POST /orgs/:org-id/invites – create an invite token.  Requires the caller to
-;; have an admin or owner role within the organisation.  Token generation and
+;; POST /orgs/:org-id/invites – create an invite token. Token generation and
 ;; persistence are stubbed out.
 (defmethod ig/init-key :etlp-mapper.handler.invites/create
   [_ {:keys [db]}]
   (fn [{[_ org-id] :ataraxy/result :as request}]
-    (let [roles (get-in request [:identity :claims :roles])]
-      (if (admin-role? roles)
-        (let [token (str (java.util.UUID/randomUUID))
-              user-id (get-in request [:identity :claims :sub])]
-          (audit-logs/log! db {:org-id org-id
-                               :user-id user-id
-                               :action "create-invite"
-                               :context {:token token}})
-          [::response/ok {:org_id org-id :token token}])
-        [::response/forbidden {:error "Insufficient role"}]))))
+    (let [token (str (java.util.UUID/randomUUID))
+          user-id (get-in request [:identity :claims :sub])]
+      (audit-logs/log! db {:org-id org-id
+                           :user-id user-id
+                           :action "create-invite"
+                           :context {:token token}})
+      [::response/ok {:org_id org-id :token token}])))
 
 ;; POST /invites/accept – accept an invite token.  In a full system the token
 ;; would be validated and the user added to the organisation along with an
