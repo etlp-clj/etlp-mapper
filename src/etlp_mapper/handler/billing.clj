@@ -5,5 +5,13 @@
 ;; POST /billing/portal – return a stubbed billing portal URL.
 (defmethod ig/init-key :etlp-mapper.handler.billing/portal
   [_ _]
-  (fn [_]
-    [::response/ok {:url "https://billing.example.com/portal"}]))
+  (fn [request]
+    (let [roles  (get-in request [:identity :roles])
+          org-id (get-in request [:identity :org/id])]
+      (cond
+        (nil? org-id)
+        [::response/forbidden {:error "Organization context required"}]
+        (admin-role? roles)
+        [::response/ok {:url "https://billing.example.com/portal" :org_id org-id}]
+        :else
+        [::response/forbidden {:error "Insufficient role"}]))))

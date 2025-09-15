@@ -1,16 +1,15 @@
 (ns etlp-mapper.handler.whoami
   (:require [ataraxy.response :as response]
-            [integrant.core :as ig]))
+            [integrant.core :as ig]
+            [etlp-mapper.identity :as identity]))
 
 (defmethod ig/init-key :etlp-mapper.handler/whoami
   [_ _]
   (fn [request]
-    (let [claims (get-in request [:identity :claims])
-          org-id (get-in request [:identity :org/id])
-          user   {:sub   (:sub claims)
-                  :email (:email claims)
-                  :exp   (:exp claims)}]
-      [::response/ok {:user   user
+    (let [user   (identity/user request)
+          org-id (identity/org-id request)
+          roles  (identity/roles request)]
+      [::response/ok {:user   (not-empty user)
                       :org_id org-id
-                      :roles (:roles claims)}])))
+                      :roles roles}])))
 
