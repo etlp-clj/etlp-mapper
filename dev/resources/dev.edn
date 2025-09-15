@@ -12,6 +12,7 @@
 
    :etlp-mapper.auth-component/require-org {}
 
+
  :etlp-mapper.keycloak/admin
  {:url           #duct/env ["KEYCLOAK_URL" :or "http://localhost:8080"]
   :realm         #duct/env ["KEYCLOAK_REALM" :or "mapify"]

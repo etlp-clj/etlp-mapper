@@ -2,10 +2,11 @@
   "Ring middleware for validating Keycloak OIDC access tokens and
   enriching the request with database backed user and organization
   context."
-  (:require [cheshire.core :as json]
-            [clojure.java.jdbc :as jdbc]
-            [clojure.string :as str]
-            [ring.util.http-response :as http])
+   (:require [cheshire.core :as json]
+             [clojure.java.jdbc :as jdbc]
+             [clojure.set :as set]
+             [clojure.string :as str]
+             [ring.util.http-response :as http])
   (:import (com.auth0.jwt JWT)
            (com.auth0.jwt.algorithms Algorithm)
            (com.auth0.jwk JwkProviderBuilder)
@@ -147,17 +148,28 @@
          (handler req)
          (forbidden "Organization context required"))))))
 
+(defn require-any-role
+  "Middleware factory enforcing that the authenticated identity has at
+  least one of the roles in `roles`."
+  [roles]
+  (fn [handler]
+    (fn [req]
+      (let [assigned (get-in req [:identity :roles])
+            required (set (map keyword roles))]
+        (if (seq (set/intersection assigned required))
+          (handler req)
+          (forbidden "Insufficient role"))))))
+
 (defn require-role
   "Middleware factory enforcing that the authenticated identity has the
   given role, using roles resolved from the database."
   [role]
-  (fn [handler]
-    (fn [req]
-      (let [roles (get-in req [:identity :roles])
-            role  (keyword role)]
-        (if (contains? roles role)
-          (handler req)
-          (forbidden "Insufficient role"))))))
+  (require-any-role [role]))
+
+(defn require-admin-or-owner
+  "Middleware allowing access to admins or owners."
+  []
+  (require-any-role [:admin :owner]))
 
 ;; Public API exports
 ;; wrap-auth, wrap-require-org and require-role
