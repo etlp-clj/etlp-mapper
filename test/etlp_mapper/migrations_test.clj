@@ -31,3 +31,11 @@
     (is (some #(re-find #"idp_sub TEXT NOT NULL" %) up))
     (is (some #(re-find #"last_used_org_id UUID" %) up))))
 
+(deftest migrations-organization-invites-table
+  (let [base (:duct.profile/base config)
+        sql  (get base [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-organization-invites])
+        up   (:up sql)]
+    (is (some #(re-find #"role TEXT NOT NULL" %) up))
+    (is (some #(re-find #"status TEXT NOT NULL" %) up))
+    (is (some #(re-find #"expires_at TIMESTAMPTZ" %) up))))
+

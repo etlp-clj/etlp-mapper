@@ -46,7 +46,8 @@
                                  "x-org-id" "org-1"}})]
         (is (= 200 (:status resp)))
         (is (= "org-1" (get-in resp [:body :org/id])))
-        (is (= #{:admin} (get-in resp [:body :roles])))))))
+        (is (= #{:admin} (get-in resp [:body :roles])))
+        (is (= "sub-1" (get-in resp [:body :claims :sub])))))))
 
 (deftest jwt-missing-org
   (let [{:keys [token verifier]} (gen-token {:sub "s" :email "e" :name "n"})
