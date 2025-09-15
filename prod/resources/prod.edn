@@ -7,6 +7,12 @@
  :duct.database/sql
  {:connection-uri "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres"}
 
+ :etlp-mapper.keycloak/admin
+ {:url           #duct/env ["KEYCLOAK_URL"]
+  :realm         #duct/env ["KEYCLOAK_REALM"]
+  :client-id     #duct/env ["KEYCLOAK_CLIENT_ID"]
+  :client-secret #duct/env ["KEYCLOAK_CLIENT_SECRET"]}
+
  :etlp-mapper.invite/token
  {:app-secret #duct/env ["APP_SECRET"]
   :invite-ttl-days #duct/env ["INVITE_TTL_DAYS" :or 7]}}

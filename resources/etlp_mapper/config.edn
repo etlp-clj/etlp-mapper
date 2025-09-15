@@ -151,7 +151,8 @@ $$ LANGUAGE plpgsql;"]
    :request {[_ id data] :ataraxy/result}
    :middleware [#ig/ref :etlp-mapper.auth-component/require-role-mapper]}
 
-  :etlp-mapper.handler.orgs/create {:db #ig/ref :duct.database/sql}
+  :etlp-mapper.handler.orgs/create {:db #ig/ref :duct.database/sql
+                                    :kc #ig/ref :etlp-mapper.keycloak/admin}
 
   :etlp-mapper.handler.invites/create {:db #ig/ref :duct.database/sql
                                        :middleware [#ig/ref :etlp-mapper.auth-component/require-role-admin]}

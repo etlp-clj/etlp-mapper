@@ -12,6 +12,12 @@
 
    :etlp-mapper.auth-component/require-org {}
 
+ :etlp-mapper.keycloak/admin
+ {:url           #duct/env ["KEYCLOAK_URL" :or "http://localhost:8080"]
+  :realm         #duct/env ["KEYCLOAK_REALM" :or "mapify"]
+  :client-id     #duct/env ["KEYCLOAK_CLIENT_ID" :or "admin-cli"]
+  :client-secret #duct/env ["KEYCLOAK_CLIENT_SECRET" :or "secret"]}
+
  :etlp-mapper.invite/token
  {:app-secret #duct/env ["APP_SECRET" :or "dev-secret"]
   :invite-ttl-days #duct/env ["INVITE_TTL_DAYS" :or 7]}}

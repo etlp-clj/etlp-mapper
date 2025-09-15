@@ -1,22 +1,14 @@
 (ns etlp-mapper.handler.orgs
   (:require [ataraxy.response :as response]
             [integrant.core :as ig]
-            [etlp-mapper.audit-logs :as audit-logs]))
-
-;; Handler for creating a new organization. Requires an authenticated user
-;; without an active organisation association. The real implementation would
-;; create the org, membership, subscription and audit log entries. Here we
-;; simply generate a UUID for the new organisation and return it.
+            [etlp-mapper.onboarding :as onboarding]))
 
 (defmethod ig/init-key :etlp-mapper.handler.orgs/create
-  [_ {:keys [db]}]
-  (fn [request]
-    (if (get-in request [:identity :org/id])
+  [_ {:keys [db kc]}]
+  (fn [{:keys [identity body-params]}]
+    (if (get-in identity [:org/id])
       [::response/forbidden {:error "Organization already selected"}]
-      (let [new-id (str (java.util.UUID/randomUUID))
-            user-id (get-in request [:identity :user :id])]
-        (audit-logs/log! db {:org-id new-id
-                             :user-id user-id
-                             :action "create-organization"})
-        [::response/ok {:org_id new-id}]))))
-
+      (let [user (get identity :user)
+            name (:name body-params)
+            org-id (onboarding/ensure-org! db kc {:name name :user user})]
+        [::response/ok {:org_id org-id}]))))
