@@ -6,14 +6,14 @@
            (com.auth0.jwt.algorithms Algorithm)))
 
 (defprotocol OrganizationInvites
-  (find-invite [db token]
-    "Find an invite by token.")
+  (find-invite [db org-id token]
+    "Find an invite by token scoped to an organization.")
   (create-invite [db data]
     "Create a new invite record.")
   (upsert-invite [db data]
     "Insert or update an invite by token.")
-  (consume-invite [db token]
-    "Delete an invite by token."))
+  (consume-invite [db org-id token]
+    "Delete an invite by token within an organization."))
 
 (defn sign-token
   "Sign invite claims with a shared secret and return a JWT string."
@@ -38,18 +38,32 @@
                 [(keyword k) (.asString v)])))
       (catch Exception _ nil))))
 
+(defn- find-invite* [db org-id token]
+  (first (jdbc/query db
+                     ["select * from organization_invites where token = ? and organization_id = ?" token org-id])))
+
+(defn- create-invite* [db data]
+  (first (jdbc/insert! db :organization_invites data)))
+
+(defn- update-invite* [spec {:keys [organization_id token] :as data}]
+  (jdbc/update! spec :organization_invites (dissoc data :token :organization_id)
+                ["token = ? and organization_id = ?" token organization_id]))
+
+(defn- consume-invite* [db org-id token]
+  (jdbc/delete! db :organization_invites
+                ["token = ? and organization_id = ?" token org-id]))
+
 (extend-protocol OrganizationInvites
   duct.database.sql.Boundary
-  (find-invite [{db :spec} token]
-    (first (jdbc/query db ["select * from organization_invites where token = ?" token])))
+  (find-invite [{db :spec} org-id token]
+    (find-invite* db org-id token))
   (create-invite [{db :spec} data]
-    (first (jdbc/insert! db :organization_invites data)))
-  (upsert-invite [db data]
-    (if (find-invite db (:token data))
-      (jdbc/update! (:spec db) :organization_invites (dissoc data :token)
-                    ["token = ?" (:token data)])
+    (create-invite* db data))
+  (upsert-invite [db {:keys [organization_id] :as data}]
+    (if (find-invite db organization_id (:token data))
+      (update-invite* (:spec db) data)
       (create-invite db data)))
-  (consume-invite [{db :spec} token]
-    (jdbc/update! db :organization_invites {:status "accepted"}
-                  ["token = ?" token])))
+  (consume-invite [{db :spec} org-id token]
+    (consume-invite* db org-id token)))
+
 
