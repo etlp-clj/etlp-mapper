@@ -5,12 +5,12 @@
 (defmethod ig/init-key :etlp-mapper.handler/whoami
   [_ _]
   (fn [request]
-    (let [claims (get-in request [:identity :claims])
-          org-id (get-in request [:identity :org/id])
-          user   {:sub   (:sub claims)
-                  :email (:email claims)
-                  :exp   (:exp claims)}]
+    (let [identity (:identity request)
+          user (-> (:user identity)
+                   (assoc :exp (get-in identity [:claims :exp])))
+          org-id (:org/id identity)
+          roles (:roles identity)]
       [::response/ok {:user   user
                       :org_id org-id
-                      :roles (:roles claims)}])))
+                      :roles roles}])))
 

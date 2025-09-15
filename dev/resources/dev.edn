@@ -10,9 +10,7 @@
   :jwks-uri #duct/env ["OIDC_JWKS_URI" :or "http://localhost:8080/realms/mapify/protocol/openid-connect/certs"]
   :db       #ig/ref :duct.database/sql}
 
- :etlp-mapper.auth-component/require-org {}
-
- :etlp-mapper.auth-component/require-role {}
+   :etlp-mapper.auth-component/require-org {}
 
  :etlp-mapper.keycloak/admin
  {:url           #duct/env ["KEYCLOAK_URL" :or "http://localhost:8080"]
