@@ -151,9 +151,11 @@ $$ LANGUAGE plpgsql;"]
 
   :etlp-mapper.handler.orgs/create {:db #ig/ref :duct.database/sql}
 
-  :etlp-mapper.handler.invites/create {:db #ig/ref :duct.database/sql}
+  :etlp-mapper.handler.invites/create {:db #ig/ref :duct.database/sql
+                                       :token #ig/ref :etlp-mapper.invite/token}
 
-  :etlp-mapper.handler.invites/accept {:db #ig/ref :duct.database/sql}
+  :etlp-mapper.handler.invites/accept {:db #ig/ref :duct.database/sql
+                                       :token #ig/ref :etlp-mapper.invite/token}
 
   :etlp-mapper.handler.me/set-active-org {}
 
