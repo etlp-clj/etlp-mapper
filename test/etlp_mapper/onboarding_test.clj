@@ -12,8 +12,9 @@
     (swap! db assoc-in [:orgs id] {:id id :name name})
     id))
 
-(defn send-invite [org-id email]
-  (swap! db assoc-in [:invites email] {:org-id org-id :status :pending}))
+(defn send-invite [org-id email role]
+  (swap! db assoc-in [:invites email]
+             {:org-id org-id :role role :token "token" :status :pending}))
 
 (defn accept-invite [email]
   (swap! db update-in [:invites email] assoc :status :accepted))
@@ -23,7 +24,7 @@
 
 (deftest onboarding-flow
   (let [org-id (create-org "Acme")
-        _ (send-invite org-id "user@example.com")
+        _ (send-invite org-id "user@example.com" :member)
         _ (accept-invite "user@example.com")
         _ (set-active-org "user@example.com" org-id)]
     (is (= org-id (get-in @db [:active "user@example.com"])))

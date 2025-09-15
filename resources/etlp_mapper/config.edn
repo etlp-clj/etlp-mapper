@@ -61,7 +61,7 @@
    :down ["DROP TABLE organization_members;"]}
 
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-organization-invites]
-  {:up ["CREATE TABLE organization_invites (id UUID PRIMARY KEY, organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, email TEXT NOT NULL, token TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP); CREATE INDEX organization_invites_organization_id_idx ON organization_invites(organization_id); CREATE UNIQUE INDEX organization_invites_token_idx ON organization_invites(token);"]
+  {:up ["CREATE TABLE organization_invites (id UUID PRIMARY KEY, organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, email TEXT NOT NULL, role TEXT NOT NULL, token TEXT NOT NULL, status TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, expires_at TIMESTAMPTZ); CREATE INDEX organization_invites_organization_id_idx ON organization_invites(organization_id); CREATE UNIQUE INDEX organization_invites_token_idx ON organization_invites(token);"]
    :down ["DROP TABLE organization_invites;"]}
 
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-organization-subscriptions]

@@ -50,5 +50,6 @@
                     ["token = ?" (:token data)])
       (create-invite db data)))
   (consume-invite [{db :spec} token]
-    (jdbc/delete! db :organization_invites ["token = ?" token])))
+    (jdbc/update! db :organization_invites {:status "accepted"}
+                  ["token = ?" token])))
 
