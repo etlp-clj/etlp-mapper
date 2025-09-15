@@ -1,7 +1,8 @@
 (ns etlp-mapper.handler.orgs
   (:require [ataraxy.response :as response]
             [integrant.core :as ig]
-            [etlp-mapper.audit-logs :as audit-logs]))
+            [etlp-mapper.audit-logs :as audit-logs]
+            [etlp-mapper.ai-usage-logs :as ai-usage-logs]))
 
 ;; Handler for creating a new organization. Requires an authenticated user
 ;; without an active organisation association. The real implementation would
@@ -18,5 +19,10 @@
         (audit-logs/log! db {:org-id new-id
                              :user-id user-id
                              :action "create-organization"})
+        (ai-usage-logs/log! db {:org-id new-id
+                                :user-id user-id
+                                :feature-type "onboarding"
+                                :input-tokens 0
+                                :output-tokens 0})
         [::response/ok {:org_id new-id}]))))
 

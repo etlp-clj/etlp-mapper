@@ -46,7 +46,9 @@
                 #ig/ref :etlp-mapper.migration/insert-mapping-history
                 #ig/ref :etlp-mapper.migration/insert_mapping_history_trigger
                 #ig/ref :etlp-mapper.migration/updated-at-trigger
-                #ig/ref :etlp-mapper.migration/updated-mapping-trigger]}
+                #ig/ref :etlp-mapper.migration/updated-mapping-trigger
+                #ig/ref :etlp-mapper.migration/audit-log-mappings-fn
+                #ig/ref :etlp-mapper.migration/audit-log-mappings-trigger]}
 
   ; Core tables
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-organizations]
@@ -125,6 +127,14 @@ $$ LANGUAGE plpgsql;"]
   {:up ["CREATE TRIGGER update_mapping_changetimestamp BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE PROCEDURE update_changetimestamp_column();"]
    :down  ["DROP TRIGGER update_mapping_changetimestamp ON mappings;"]}
 
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration/audit-log-mappings-fn]
+  {:up ["CREATE OR REPLACE FUNCTION audit_log_mappings() RETURNS TRIGGER AS $$ BEGIN IF (TG_OP = 'INSERT') THEN INSERT INTO audit_logs (organization_id, action, context) VALUES (NEW.organization_id, 'mappings-insert', json_build_object('mapping_id', NEW.id)::text); RETURN NEW; ELSIF (TG_OP = 'UPDATE') THEN INSERT INTO audit_logs (organization_id, action, context) VALUES (NEW.organization_id, 'mappings-update', json_build_object('mapping_id', NEW.id)::text); RETURN NEW; ELSIF (TG_OP = 'DELETE') THEN INSERT INTO audit_logs (organization_id, action, context) VALUES (OLD.organization_id, 'mappings-delete', json_build_object('mapping_id', OLD.id)::text); RETURN OLD; END IF; END; $$ LANGUAGE plpgsql;"]
+   :down ["DROP FUNCTION audit_log_mappings;"]}
+
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration/audit-log-mappings-trigger]
+  {:up ["CREATE TRIGGER audit_log_mappings_trigger AFTER INSERT OR UPDATE OR DELETE ON mappings FOR EACH ROW EXECUTE FUNCTION audit_log_mappings();"]
+   :down ["DROP TRIGGER audit_log_mappings_trigger ON mappings;"]}
+
 
 
 ;Query handlers for Rest Endpoints
@@ -155,11 +165,11 @@ $$ LANGUAGE plpgsql;"]
 
   :etlp-mapper.handler.invites/accept {:db #ig/ref :duct.database/sql}
 
-  :etlp-mapper.handler.me/set-active-org {}
+  :etlp-mapper.handler.me/set-active-org {:db #ig/ref :duct.database/sql}
 
   :etlp-mapper.handler.billing/portal {}
 
-  [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create]
+  [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create-sql]
   {:request {[_ title content] :ataraxy/result
              {org-id :org/id} :identity}
 
@@ -167,22 +177,34 @@ $$ LANGUAGE plpgsql;"]
    :location "mappings/{id}"
    :hrefs {:href "/mappings/{id}"}}
 
+  :etlp-mapper.handler.mappings/create
+  {:db #ig/ref :duct.database/sql
+   :handler #ig/ref [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create-sql]}
+
   [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/find]
   {:request {[_ id] :ataraxy/result
              {org-id :org/id} :identity}
    :sql     ["SELECT * FROM mappings WHERE id = ? AND organization_id = ?::uuid" id org-id]
    :hrefs   {:href "/mappings/{id}"}}
 
-  [:duct.handler.sql/execute :etlp-mapper.handler.mappings/destroy]
+  [:duct.handler.sql/execute :etlp-mapper.handler.mappings/destroy-sql]
   {:request {[_ id] :ataraxy/result
              {org-id :org/id} :identity}
 
    :sql     ["DELETE FROM mappings WHERE id = ? AND organization_id = ?::uuid" id org-id]}
 
-  [:duct.handler.sql/execute :etlp-mapper.handler.mappings/update]
+  :etlp-mapper.handler.mappings/destroy
+  {:db #ig/ref :duct.database/sql
+   :handler #ig/ref [:duct.handler.sql/execute :etlp-mapper.handler.mappings/destroy-sql]}
+
+  [:duct.handler.sql/execute :etlp-mapper.handler.mappings/update-sql]
   {:request {[_ id content] :ataraxy/result
              {org-id :org/id} :identity}
    :sql     ["UPDATE mappings SET content = ? WHERE id = ? AND organization_id = ?::uuid" content id org-id]}
+
+  :etlp-mapper.handler.mappings/update
+  {:db #ig/ref :duct.database/sql
+   :handler #ig/ref [:duct.handler.sql/execute :etlp-mapper.handler.mappings/update-sql]}
 
   [:duct.handler.sql/query :etlp-mapper.handler.mappings/history]
   {:request {[_ id] :ataraxy/result

@@ -34,6 +34,19 @@
           compiled (jt/compile template)]
       (compiled data))))
 
+(defn- log-mapping-event!
+  [db org-id user-id action feature-type context]
+  (when org-id
+    (audit-logs/log! db {:org-id org-id
+                         :user-id user-id
+                         :action action
+                         :context context})
+    (ai-usage-logs/log! db {:org-id org-id
+                            :user-id user-id
+                            :feature-type feature-type
+                            :input-tokens 0
+                            :output-tokens 0})))
+
 (defn create [request]
   (let [org-id      (get-in request [:identity :org/id])
         yaml-content (slurp (:body request))
@@ -53,17 +66,43 @@
           user-id (get-in request [:identity :claims :sub])]
       (try
         (let [translated (apply-mapping db org-id id data)]
-          (audit-logs/log! db {:org-id org-id
-                               :user-id user-id
-                               :action "apply-mapping"
-                               :context {:mapping-id id}})
-          (ai-usage-logs/log! db {:org-id org-id
-                                  :user-id user-id
-                                  :feature-type "transform"})
+          (log-mapping-event! db org-id user-id "apply-mapping" "transform" {:mapping-id id})
           [::response/ok {:result translated :org/id org-id}])
         (catch Exception e
           (println e)
           [::response/bad-request {:error (str e)}])))))
+
+(defmethod ig/init-key :etlp-mapper.handler.mappings/create
+  [_ {:keys [db handler]}]
+  (assert handler "Missing SQL handler for mapping creation")
+  (fn [{[_ title _] :ataraxy/result :as request}]
+    (let [org-id (get-in request [:identity :org/id])
+          user-id (get-in request [:identity :claims :sub])
+          inferred-title (or title (get-in request [:body-params :title]))
+          context (cond-> {}
+                    inferred-title (assoc :title inferred-title))]
+      (log-mapping-event! db org-id user-id "create-mapping" "mapping-create" context)
+      (handler request))))
+
+(defmethod ig/init-key :etlp-mapper.handler.mappings/update
+  [_ {:keys [db handler]}]
+  (assert handler "Missing SQL handler for mapping update")
+  (fn [{[_ mapping-id content] :ataraxy/result :as request}]
+    (let [org-id (get-in request [:identity :org/id])
+          user-id (get-in request [:identity :claims :sub])
+          context (-> {:mapping-id mapping-id}
+                      (cond-> content (assoc :has-content true)))]
+      (log-mapping-event! db org-id user-id "update-mapping" "mapping-update" context)
+      (handler request))))
+
+(defmethod ig/init-key :etlp-mapper.handler.mappings/destroy
+  [_ {:keys [db handler]}]
+  (assert handler "Missing SQL handler for mapping delete")
+  (fn [{[_ mapping-id] :ataraxy/result :as request}]
+    (let [org-id (get-in request [:identity :org/id])
+          user-id (get-in request [:identity :claims :sub])]
+      (log-mapping-event! db org-id user-id "destroy-mapping" "mapping-delete" {:mapping-id mapping-id})
+      (handler request))))
 
 (defmethod ig/init-key :etlp-mapper.handler.mappings [_ {:keys [db]}]
   (fn [request]
@@ -72,10 +111,7 @@
       (try
         (let [translated (create request)]
           (pprint translated)
-          (audit-logs/log! db {:org-id org-id
-                               :user-id user-id
-                               :action "create-mapping"
-                               :context {:request (:request translated)}})
+          (log-mapping-event! db org-id user-id "create-mapping" "mapping-create" {:request (:request translated)})
           [::response/ok (assoc translated :org/id org-id)])
         (catch Exception e
           (println e)
