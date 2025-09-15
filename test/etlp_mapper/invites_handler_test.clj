@@ -1,6 +1,7 @@
 (ns etlp-mapper.invites-handler-test
   (:require [clojure.test :refer :all]
             [integrant.core :as ig]
+            [ataraxy.handler :as handler]
             [etlp-mapper.handler.invites]
             [etlp-mapper.organization-invites :as org-invites]
             [etlp-mapper.organization-members :as org-members]
@@ -10,9 +11,9 @@
   (let [app (ig/init-key :etlp-mapper.handler.invites/create {:db ::db
                                                               :token {:app-secret "s"}})
         resp (app {:ataraxy/result [nil "org-1"]
-                    :body-params {:email "user@example.com"}
-                    :identity {:user {:id "u1"}
-                               :roles #{:user}}})]
+                   :body-params {:email "user@example.com"}
+                   :identity {:user {:id "u1"}
+                              :roles #{:user}}})]
     (is (= 403 (:status resp)))))
 
 (deftest create-stores-invite
@@ -23,16 +24,17 @@
                                                                :token {:app-secret secret}})]
     (with-redefs [org-invites/upsert-invite (fn [_ data] (reset! captured data))
                   audit-logs/log! (fn [_ data] (reset! log-captured data))]
-      (let [resp (app {:ataraxy/result [nil "org-1"]
-                       :body-params {:email "user@example.com"}
-                       :identity {:user {:id "user-1"}
-                                  :roles #{:admin}}})]
+      (let [resp (handler/sync-default {:ataraxy/result
+                                        (app {:ataraxy/result [nil "org-1"]
+                                              :body-params {:email "user@example.com"}
+                                              :identity {:user {:id "user-1"}
+                                                         :roles #{:admin}}})})]
         (is (= 200 (:status resp)))
         (is (:token (:body resp)))
         (is (= "org-1" (:organization_id @captured)))
         (is (= "user@example.com" (:email @captured)))
         (is (= "create-invite" (:action @log-captured)))
-        (is (org-invites/verify-token secret (:token (:body resp)))))))
+        (is (org-invites/verify-token secret (:token (:body resp))))))))
 
 (deftest accept-invite-adds-member
   (let [secret "s"
@@ -48,8 +50,9 @@
                   org-invites/consume-invite (fn [_ _] (reset! consume? true))
                   org-members/add-member (fn [_ data] (reset! add-captured data))
                   audit-logs/log! (fn [_ data] (reset! log-captured data))]
-      (let [resp (app {:body-params {:token token}
-                       :identity {:user {:id "user-1"}}})]
+      (let [resp (handler/sync-default {:ataraxy/result
+                                        (app {:body-params {:token token}
+                                              :identity {:user {:id "user-1"}}})})]
         (is (= 200 (:status resp)))
         (is (= {:organization_id "org-1" :user_id "user-1" :role "mapper"}
                @add-captured))
