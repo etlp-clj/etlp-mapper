@@ -11,9 +11,15 @@
 ;; persistence are stubbed out.
 (defmethod ig/init-key :etlp-mapper.handler.invites/create
   [_ {:keys [db]}]
-  (fn [{[_ org-id] :ataraxy/result :as request}]
-    (let [roles (get-in request [:identity :claims :roles])]
-      (if (admin-role? roles)
+  (fn [{[_ path-org] :ataraxy/result :as request}]
+    (let [org-id (get-in request [:identity :org/id])
+          roles  (get-in request [:identity :claims :roles])]
+      (cond
+        (nil? org-id)
+        [::response/forbidden {:error "Organization context required"}]
+        (not= path-org org-id)
+        [::response/forbidden {:error "Organization mismatch"}]
+        (admin-role? roles)
         (let [token (str (java.util.UUID/randomUUID))
               user-id (get-in request [:identity :claims :sub])]
           (audit-logs/log! db {:org-id org-id
@@ -21,6 +27,7 @@
                                :action "create-invite"
                                :context {:token token}})
           [::response/ok {:org_id org-id :token token}])
+        :else
         [::response/forbidden {:error "Insufficient role"}]))))
 
 ;; POST /invites/accept – accept an invite token.  In a full system the token
@@ -30,12 +37,13 @@
 (defmethod ig/init-key :etlp-mapper.handler.invites/accept
   [_ {:keys [db]}]
   (fn [{{:keys [token org_id]} :body-params :as request}]
-    (let [user-id (get-in request [:identity :claims :sub])]
-      (if token
+    (let [resolved-org (or (get-in request [:identity :org/id]) org_id)
+          user-id      (get-in request [:identity :claims :sub])]
+      (if (and token resolved-org)
         (do
-          (audit-logs/log! db {:org-id org_id
+          (audit-logs/log! db {:org-id resolved-org
                                :user-id user-id
                                :action "accept-invite"
                                :context {:token token}})
-          [::response/ok {:org_id org_id :token token :status "accepted"}])
-        [::response/bad-request {:error "Invalid token"}]))))
+          [::response/ok {:org_id resolved-org :token token :status "accepted"}])
+        [::response/bad-request {:error "Invalid token or organization"}]))))

@@ -51,32 +51,36 @@
   (fn [{[_ id data] :ataraxy/result :as request}]
     (let [org-id (get-in request [:identity :org/id])
           user-id (get-in request [:identity :claims :sub])]
-      (try
-        (let [translated (apply-mapping db org-id id data)]
-          (audit-logs/log! db {:org-id org-id
-                               :user-id user-id
-                               :action "apply-mapping"
-                               :context {:mapping-id id}})
-          (ai-usage-logs/log! db {:org-id org-id
-                                  :user-id user-id
-                                  :feature-type "transform"})
-          [::response/ok {:result translated :org/id org-id}])
-        (catch Exception e
-          (println e)
-          [::response/bad-request {:error (str e)}])))))
+      (if (nil? org-id)
+        [::response/forbidden {:error "Organization context required"}]
+        (try
+          (let [translated (apply-mapping db org-id id data)]
+            (audit-logs/log! db {:org-id org-id
+                                 :user-id user-id
+                                 :action "apply-mapping"
+                                 :context {:mapping-id id}})
+            (ai-usage-logs/log! db {:org-id org-id
+                                    :user-id user-id
+                                    :feature-type "transform"})
+            [::response/ok {:result translated :org/id org-id}])
+          (catch Exception e
+            (println e)
+            [::response/bad-request {:error (str e)}])))))
 
 (defmethod ig/init-key :etlp-mapper.handler.mappings [_ {:keys [db]}]
   (fn [request]
     (let [org-id (get-in request [:identity :org/id])
           user-id (get-in request [:identity :claims :sub])]
-      (try
-        (let [translated (create request)]
-          (pprint translated)
-          (audit-logs/log! db {:org-id org-id
-                               :user-id user-id
-                               :action "create-mapping"
-                               :context {:request (:request translated)}})
-          [::response/ok (assoc translated :org/id org-id)])
-        (catch Exception e
-          (println e)
-          [::response/bad-request {:error (.getMessage e)}])))))
+      (if (nil? org-id)
+        [::response/forbidden {:error "Organization context required"}]
+        (try
+          (let [translated (create request)]
+            (pprint translated)
+            (audit-logs/log! db {:org-id org-id
+                                 :user-id user-id
+                                 :action "create-mapping"
+                                 :context {:request (:request translated)}})
+            [::response/ok (assoc translated :org/id org-id)])
+          (catch Exception e
+            (println e)
+            [::response/bad-request {:error (.getMessage e)}]))))))

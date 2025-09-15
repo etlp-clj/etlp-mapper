@@ -4,8 +4,8 @@
             duct.database.sql))
 
 (defprotocol AIUsageLogs
-  (find-usage [db id]
-    "Find a usage record by id.")
+  (find-usage [db org-id id]
+    "Find a usage record by id scoped to an organization.")
   (find-usage-for-org [db org-id]
     "List usage records for an organization.")
   (log-usage [db data]
@@ -13,8 +13,9 @@
 
 (extend-protocol AIUsageLogs
   duct.database.sql.Boundary
-  (find-usage [{db :spec} id]
-    (first (jdbc/query db ["select * from ai_usage_logs where id = ?" id])))
+  (find-usage [{db :spec} org-id id]
+    (first (jdbc/query db
+                       ["select * from ai_usage_logs where id = ? and organization_id = ?" id org-id])))
   (find-usage-for-org [{db :spec} org-id]
     (jdbc/query db ["select * from ai_usage_logs where organization_id = ?" org-id]))
   (log-usage [{db :spec} data]
