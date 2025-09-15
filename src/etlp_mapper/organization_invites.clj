@@ -38,19 +38,31 @@
                 [(keyword k) (.asString v)])))
       (catch Exception _ nil))))
 
+(defn- find-invite* [db org-id token]
+  (first (jdbc/query db
+                     ["select * from organization_invites where token = ? and organization_id = ?" token org-id])))
+
+(defn- create-invite* [db data]
+  (first (jdbc/insert! db :organization_invites data)))
+
+(defn- update-invite* [spec {:keys [organization_id token] :as data}]
+  (jdbc/update! spec :organization_invites (dissoc data :token :organization_id)
+                ["token = ? and organization_id = ?" token organization_id]))
+
+(defn- consume-invite* [db org-id token]
+  (jdbc/delete! db :organization_invites
+                ["token = ? and organization_id = ?" token org-id]))
+
 (extend-protocol OrganizationInvites
   duct.database.sql.Boundary
   (find-invite [{db :spec} org-id token]
-    (first (jdbc/query db
-                       ["select * from organization_invites where token = ? and organization_id = ?" token org-id])))
+    (find-invite* db org-id token))
   (create-invite [{db :spec} data]
-    (first (jdbc/insert! db :organization_invites data)))
+    (create-invite* db data))
   (upsert-invite [db {:keys [organization_id] :as data}]
     (if (find-invite db organization_id (:token data))
-      (jdbc/update! (:spec db) :organization_invites (dissoc data :token :organization_id)
-                    ["token = ? and organization_id = ?" (:token data) organization_id])
+      (update-invite* (:spec db) data)
       (create-invite db data)))
   (consume-invite [{db :spec} org-id token]
-    (jdbc/delete! db :organization_invites
-                  ["token = ? and organization_id = ?" token org-id])))
+    (consume-invite* db org-id token)))
 

@@ -50,7 +50,7 @@
 (defmethod ig/init-key :etlp-mapper.handler/apply-mappings [_ {:keys [db]}]
   (fn [{[_ id data] :ataraxy/result :as request}]
     (let [org-id (get-in request [:identity :org/id])
-          user-id (get-in request [:identity :claims :sub])]
+          user-id (get-in request [:identity :user :id])]
       (if (nil? org-id)
         [::response/forbidden {:error "Organization context required"}]
         (try
@@ -70,7 +70,7 @@
 (defmethod ig/init-key :etlp-mapper.handler.mappings [_ {:keys [db]}]
   (fn [request]
     (let [org-id (get-in request [:identity :org/id])
-          user-id (get-in request [:identity :claims :sub])]
+          user-id (get-in request [:identity :user :id])]
       (if (nil? org-id)
         [::response/forbidden {:error "Organization context required"}]
         (try

@@ -13,14 +13,23 @@
   (upsert-subscription [db data]
     "Insert or update a subscription by :organization_id in data."))
 
+(defn- find-subscription* [db org-id]
+  (first (jdbc/query db ["select * from organization_subscriptions where organization_id = ?" org-id])))
+
+(defn- create-subscription* [db data]
+  (first (jdbc/insert! db :organization_subscriptions data)))
+
+(defn- update-subscription* [db org-id data]
+  (jdbc/update! db :organization_subscriptions data ["organization_id = ?" org-id]))
+
 (extend-protocol OrganizationSubscriptions
   duct.database.sql.Boundary
   (find-subscription [{db :spec} org-id]
-    (first (jdbc/query db ["select * from organization_subscriptions where organization_id = ?" org-id])))
+    (find-subscription* db org-id))
   (create-subscription [{db :spec} data]
-    (first (jdbc/insert! db :organization_subscriptions data)))
+    (create-subscription* db data))
   (update-subscription [{db :spec} org-id data]
-    (jdbc/update! db :organization_subscriptions data ["organization_id = ?" org-id]))
+    (update-subscription* db org-id data))
   (upsert-subscription [db data]
     (if (find-subscription db (:organization_id data))
       (update-subscription db (:organization_id data) (dissoc data :organization_id))

@@ -13,7 +13,7 @@
   [_ {:keys [db]}]
   (fn [{[_ path-org] :ataraxy/result :as request}]
     (let [org-id (get-in request [:identity :org/id])
-          roles  (get-in request [:identity :claims :roles])]
+          roles  (get-in request [:identity :roles])]
       (cond
         (nil? org-id)
         [::response/forbidden {:error "Organization context required"}]
@@ -21,7 +21,7 @@
         [::response/forbidden {:error "Organization mismatch"}]
         (admin-role? roles)
         (let [token (str (java.util.UUID/randomUUID))
-              user-id (get-in request [:identity :claims :sub])]
+              user-id (get-in request [:identity :user :id])]
           (audit-logs/log! db {:org-id org-id
                                :user-id user-id
                                :action "create-invite"
@@ -37,13 +37,19 @@
 (defmethod ig/init-key :etlp-mapper.handler.invites/accept
   [_ {:keys [db]}]
   (fn [{{:keys [token org_id]} :body-params :as request}]
-    (let [resolved-org (or (get-in request [:identity :org/id]) org_id)
-          user-id      (get-in request [:identity :claims :sub])]
-      (if (and token resolved-org)
+    (let [org-id (get-in request [:identity :org/id])
+          user-id (get-in request [:identity :user :id])]
+      (cond
+        (nil? org-id)
+        [::response/forbidden {:error "Organization context required"}]
+        (and org_id (not= org_id org-id))
+        [::response/forbidden {:error "Organization mismatch"}]
+        (nil? token)
+        [::response/bad-request {:error "Invalid token"}]
+        :else
         (do
-          (audit-logs/log! db {:org-id resolved-org
+          (audit-logs/log! db {:org-id org-id
                                :user-id user-id
                                :action "accept-invite"
                                :context {:token token}})
-          [::response/ok {:org_id resolved-org :token token :status "accepted"}])
-        [::response/bad-request {:error "Invalid token or organization"}]))))
+          [::response/ok {:org_id org-id :token token :status "accepted"}])))))

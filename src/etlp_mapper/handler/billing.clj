@@ -10,7 +10,7 @@
 (defmethod ig/init-key :etlp-mapper.handler.billing/portal
   [_ _]
   (fn [request]
-    (let [roles  (get-in request [:identity :claims :roles])
+    (let [roles  (get-in request [:identity :roles])
           org-id (get-in request [:identity :org/id])]
       (cond
         (nil? org-id)

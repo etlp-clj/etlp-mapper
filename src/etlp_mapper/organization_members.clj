@@ -15,20 +15,35 @@
   (has-role? [db org-id user-id role]
     "Check if a user has a role in an organization."))
 
+(defn- find-members* [db org-id]
+  (jdbc/query db ["select * from organization_members where organization_id = ?" org-id]))
+
+(defn- add-member* [db data]
+  (first (jdbc/insert! db :organization_members data)))
+
+(defn- remove-member* [db org-id user-id]
+  (jdbc/delete! db :organization_members ["organization_id = ? and user_id = ?" org-id user-id]))
+
+(defn- member?* [db org-id user-id]
+  (-> (jdbc/query db ["select 1 from organization_members where organization_id = ? and user_id = ? limit 1" org-id user-id])
+      empty?
+      not))
+
+(defn- has-role?* [db org-id user-id role]
+  (-> (jdbc/query db ["select 1 from organization_members where organization_id = ? and user_id = ? and role = ? limit 1" org-id user-id role])
+      empty?
+      not))
+
 (extend-protocol OrganizationMembers
   duct.database.sql.Boundary
   (find-members [{db :spec} org-id]
-    (jdbc/query db ["select * from organization_members where organization_id = ?" org-id]))
+    (find-members* db org-id))
   (add-member [{db :spec} data]
-    (first (jdbc/insert! db :organization_members data)))
+    (add-member* db data))
   (remove-member [{db :spec} org-id user-id]
-    (jdbc/delete! db :organization_members ["organization_id = ? and user_id = ?" org-id user-id]))
+    (remove-member* db org-id user-id))
   (member? [{db :spec} org-id user-id]
-    (-> (jdbc/query db ["select 1 from organization_members where organization_id = ? and user_id = ? limit 1" org-id user-id])
-        empty?
-        not))
+    (member?* db org-id user-id))
   (has-role? [{db :spec} org-id user-id role]
-    (-> (jdbc/query db ["select 1 from organization_members where organization_id = ? and user_id = ? and role = ? limit 1" org-id user-id role])
-        empty?
-        not)))
+    (has-role?* db org-id user-id role)))
 

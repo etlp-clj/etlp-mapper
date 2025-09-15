@@ -11,15 +11,24 @@
   (create-log [db data]
     "Insert a new audit log entry."))
 
+(defn- find-log* [db org-id id]
+  (first (jdbc/query db
+                     ["select * from audit_logs where id = ? and organization_id = ?" id org-id])))
+
+(defn- find-logs* [db org-id]
+  (jdbc/query db ["select * from audit_logs where organization_id = ? order by created_at desc" org-id]))
+
+(defn- create-log* [db data]
+  (first (jdbc/insert! db :audit_logs data)))
+
 (extend-protocol AuditLogs
   duct.database.sql.Boundary
   (find-log [{db :spec} org-id id]
-    (first (jdbc/query db
-                       ["select * from audit_logs where id = ? and organization_id = ?" id org-id])))
+    (find-log* db org-id id))
   (find-logs [{db :spec} org-id]
-    (jdbc/query db ["select * from audit_logs where organization_id = ? order by created_at desc" org-id]))
+    (find-logs* db org-id))
   (create-log [{db :spec} data]
-    (first (jdbc/insert! db :audit_logs data))))
+    (create-log* db data)))
 
 
 (defn log!

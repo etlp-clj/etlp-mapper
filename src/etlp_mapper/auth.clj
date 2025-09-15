@@ -117,7 +117,8 @@
                                 #{})))
                   identity {:user {:id (:id user)
                                    :email (:email user)
-                                   :idp-sub (:idp_sub user)}
+                                   :idp-sub (:idp_sub user)
+                                   :last-used-org-id (:last_used_org_id user)}
                             :org/id org-id
                             :roles roles}
                   resp    (handler (assoc req :identity identity))]
