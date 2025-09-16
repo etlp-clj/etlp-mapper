@@ -28,6 +28,14 @@
   (find-logs [{db :spec} org-id]
     (find-logs* db org-id))
   (create-log [{db :spec} data]
+    (create-log* db data))
+
+  clojure.lang.IPersistentMap
+  (find-log [db org-id id]
+    (find-log* db org-id id))
+  (find-logs [db org-id]
+    (find-logs* db org-id))
+  (create-log [db data]
     (create-log* db data)))
 
 

@@ -3,7 +3,9 @@
             [integrant.core :as ig]
             [ring.mock.request :as mock]
             [etlp-mapper.handler.orgs]
-            [etlp-mapper.onboarding :as onboarding]))
+            [etlp-mapper.onboarding :as onboarding]
+            [etlp-mapper.audit-logs :as audit-logs]
+            [etlp-mapper.ai-usage-logs :as ai-usage-logs]))
 
 (deftest post-orgs-idempotent
   (let [store (atom {})
@@ -14,7 +16,9 @@
                      (swap! store assoc id {:id id :name name})
                      id)))
         handler (ig/init-key :etlp-mapper.handler.orgs/create {:db {} :kc {}})]
-    (with-redefs [onboarding/ensure-org! ensure]
+    (with-redefs [onboarding/ensure-org! ensure
+                  audit-logs/log! (fn [& _] nil)
+                  ai-usage-logs/log! (fn [& _] nil)]
       (let [req (-> (mock/request :post "/orgs" {:name "Acme"})
                     (assoc :identity {:user {:id "user-1"}})
                     (assoc :body-params {:name "Acme"}))

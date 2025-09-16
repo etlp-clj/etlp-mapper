@@ -12,7 +12,8 @@
             [duct.handler.sql :as sql]
             [cheshire.core :as json]
             [etlp-mapper.audit-logs :as audit-logs]
-            [etlp-mapper.ai-usage-logs :as ai-usage-logs])
+            [etlp-mapper.ai-usage-logs :as ai-usage-logs]
+            [etlp-mapper.identity :as identity])
   (:import java.util.Base64))
 
 (defprotocol Mappings
@@ -63,7 +64,7 @@
 (defmethod ig/init-key :etlp-mapper.handler/apply-mappings [_ {:keys [db]}]
   (fn [{[_ id data] :ataraxy/result :as request}]
     (let [org-id (get-in request [:identity :org/id])
-          user-id (get-in request [:identity :claims :sub])]
+          user-id (identity/user-id request)]
       (try
         (let [translated (apply-mapping db org-id id data)]
           (log-mapping-event! db org-id user-id "apply-mapping" "transform" {:mapping-id id})
@@ -77,7 +78,7 @@
   (assert handler "Missing SQL handler for mapping creation")
   (fn [{[_ title _] :ataraxy/result :as request}]
     (let [org-id (get-in request [:identity :org/id])
-          user-id (get-in request [:identity :claims :sub])
+          user-id (identity/user-id request)
           inferred-title (or title (get-in request [:body-params :title]))
           context (cond-> {}
                     inferred-title (assoc :title inferred-title))]
@@ -89,7 +90,7 @@
   (assert handler "Missing SQL handler for mapping update")
   (fn [{[_ mapping-id content] :ataraxy/result :as request}]
     (let [org-id (get-in request [:identity :org/id])
-          user-id (get-in request [:identity :claims :sub])
+          user-id (identity/user-id request)
           context (-> {:mapping-id mapping-id}
                       (cond-> content (assoc :has-content true)))]
       (log-mapping-event! db org-id user-id "update-mapping" "mapping-update" context)
@@ -100,14 +101,14 @@
   (assert handler "Missing SQL handler for mapping delete")
   (fn [{[_ mapping-id] :ataraxy/result :as request}]
     (let [org-id (get-in request [:identity :org/id])
-          user-id (get-in request [:identity :claims :sub])]
+          user-id (identity/user-id request)]
       (log-mapping-event! db org-id user-id "destroy-mapping" "mapping-delete" {:mapping-id mapping-id})
       (handler request))))
 
 (defmethod ig/init-key :etlp-mapper.handler.mappings [_ {:keys [db]}]
   (fn [request]
     (let [org-id (get-in request [:identity :org/id])
-          user-id (get-in request [:identity :claims :sub])]
+          user-id (identity/user-id request)]
       (try
         (let [translated (create request)]
           (pprint translated)

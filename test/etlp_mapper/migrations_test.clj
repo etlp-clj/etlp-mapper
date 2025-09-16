@@ -31,6 +31,12 @@
     (is (some #(re-find #"idp_sub TEXT NOT NULL" %) up))
     (is (some #(re-find #"last_used_org_id UUID" %) up))))
 
+(deftest migrations-organizations-created-user
+  (let [base (:duct.profile/base config)
+        sql  (get base [:duct.migrator.ragtime/sql :etlp-mapper.migration/add-organizations-created-user])
+        up   (:up sql)]
+    (is (some #(re-find #"created_user_id" %) up))))
+
 (deftest migrations-organization-invites-table
   (let [base (:duct.profile/base config)
         sql  (get base [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-organization-invites])

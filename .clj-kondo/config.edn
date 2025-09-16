@@ -1,0 +1,2 @@
+{:hooks {:analyze-call {clojure.java.jdbc/query etlp-mapper.kondo/jdbc-query}}
+ :linters {:etlp/org-scope {:level :warning}}}

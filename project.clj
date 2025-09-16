@@ -23,6 +23,9 @@
             [com.github.clj-kondo/lein-clj-kondo "0.2.5"]]
   :aliases {"clj-kondo-deps" ["with-profile" "+test" "clj-kondo" "--copy-configs" "--dependencies" "--parallel" "--lint" "$classpath"]
             "clj-kondo-lint" ["do" ["clj-kondo-deps"] ["with-profile" "+test" "clj-kondo"]]}
+  :test-selectors {:default (complement :integration)
+                   :integration :integration
+                   :all (constantly true)}
   :main ^:skip-aot etlp-mapper.main
   :resource-paths ["resources" "target/resources"]
   :prep-tasks     ["javac" "compile"]

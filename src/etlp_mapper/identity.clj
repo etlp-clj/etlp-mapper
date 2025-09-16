@@ -71,4 +71,4 @@
       (get-in request [:identity :user_id])
       (get-in request [:identity :claims :user-id])
       (get-in request [:identity :claims :user_id])
-      (get-in request [:identity :claims :sub]))))
+      (get-in request [:identity :claims :sub])))

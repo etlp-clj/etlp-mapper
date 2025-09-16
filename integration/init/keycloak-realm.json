@@ -1,0 +1,101 @@
+{
+  "realm": "mapify",
+  "enabled": true,
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": true,
+  "clients": [
+    {
+      "clientId": "mapify-studio",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "attributes": { "pkce.code.challenge.method": "S256" },
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "defaultClientScopes": ["profile","email","roles","web-origins", "mapify-claims"]
+    },
+    {
+      "clientId": "mapify-api",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "dev-local-not-for-prod",
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "owner" },
+      { "name": "admin" },
+      { "name": "editor" },
+      { "name": "viewer" }
+    ]
+  },
+  "groups": [
+    {
+      "name": "org-dev-0001",
+      "attributes": { "org_id": ["org-dev-0001"] },
+      "subGroups": [
+        { "name": "owner" }, { "name": "admin" }, { "name": "editor" }, { "name": "viewer" }
+      ]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "mapify-claims",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true" },
+      "protocolMappers": [
+        {
+          "name": "org_id (group attr)",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "org_id",
+            "aggregate.attrs": "true",
+            "multivalued": "false",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "org_id"
+          }
+        },
+        {
+          "name": "roles list",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "audience mapify-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "included.client.audience": "mapify-api"
+          }
+        }
+      ]
+    }
+  ],
+  "defaultDefaultClientScopes": ["mapify-claims"],
+  "users": [
+    {
+      "username": "dev@mapify.local",
+      "email": "dev@mapify.local",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "devdevdev", "temporary": false }],
+      "realmRoles": ["owner"],
+      "groups": ["org-dev-0001","org-dev-0001/owner"]
+    }
+  ]
+}

@@ -36,10 +36,11 @@
                                    #ig/ref :etlp-mapper.middlewares/cors]}
 
 
-  :duct.migrator/ragtime
-  {:migrations [#ig/ref :etlp-mapper.migration/create-organizations
-                #ig/ref :etlp-mapper.migration/create-users
-                #ig/ref :etlp-mapper.migration/create-organization-members
+   :duct.migrator/ragtime
+   {:migrations [#ig/ref :etlp-mapper.migration/create-organizations
+                 #ig/ref :etlp-mapper.migration/create-users
+                 #ig/ref :etlp-mapper.migration/add-organizations-created-user
+                 #ig/ref :etlp-mapper.migration/create-organization-members
                 #ig/ref :etlp-mapper.migration/create-organization-invites
                 #ig/ref :etlp-mapper.migration/create-organization-subscriptions
                 #ig/ref :etlp-mapper.migration/create-audit-logs
@@ -61,6 +62,10 @@
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-users]
   {:up ["CREATE TABLE users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), idp_sub TEXT NOT NULL UNIQUE, email TEXT NOT NULL, name TEXT, last_used_org_id UUID REFERENCES organizations(id), created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP); CREATE UNIQUE INDEX users_email_idx ON users(email);"]
    :down ["DROP TABLE users;"]}
+
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration/add-organizations-created-user]
+  {:up ["ALTER TABLE organizations ADD COLUMN created_user_id UUID REFERENCES users(id); CREATE INDEX organizations_created_user_idx ON organizations(created_user_id);"]
+   :down ["ALTER TABLE organizations DROP COLUMN created_user_id;"]}
 
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-organization-members]
   {:up ["CREATE TABLE organization_members (organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (organization_id, user_id)); CREATE INDEX organization_members_user_id_idx ON organization_members(user_id);"]
@@ -141,11 +146,11 @@ $$ LANGUAGE plpgsql;"]
 
 
 ;Query handlers for Rest Endpoints
-  [:duct.handler.sql/query :etlp-mapper.handler.mappings/list]
-  {:request {{org-id :org/id} :identity}
-   :sql ["SELECT * FROM mappings WHERE organization_id = ?::uuid" org-id]
-   :hrefs {:href "/mappings/{id}"}
-   :middleware [#ig/ref :etlp-mapper.auth-component/require-role-mapper]}
+    [:duct.handler.sql/query :etlp-mapper.handler.mappings/list]
+    {:request {{org-id :org/id} :identity}
+     :sql ["SELECT * FROM mappings WHERE organization_id = ?::uuid" org-id]
+     :hrefs {:href "/mappings/{id}"}
+     :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
   :etlp-mapper.auth-component/require-owner {}
   :etlp-mapper.auth-component/require-admin {}
@@ -162,12 +167,12 @@ $$ LANGUAGE plpgsql;"]
 
   :etlp-mapper.handler.mappings
   {:db #ig/ref :duct.database/sql
-   :middleware [#ig/ref :etlp-mapper.auth-component/require-role-mapper]}
+   :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
   :etlp-mapper.handler/apply-mappings
   {:db #ig/ref :duct.database/sql
    :request {[_ id data] :ataraxy/result}
-   :middleware [#ig/ref :etlp-mapper.auth-component/require-role-mapper]}
+   :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
   :etlp-mapper.handler.orgs/create {:db #ig/ref :duct.database/sql
                                     :kc #ig/ref :etlp-mapper.keycloak/admin}
@@ -180,19 +185,18 @@ $$ LANGUAGE plpgsql;"]
 
   :etlp-mapper.handler.me/set-active-org {:db #ig/ref :duct.database/sql}
 
-  :etlp-mapper.handler.billing/portal {:middleware [#ig/ref :etlp-mapper.auth-component/require-role-admin]}
+  :etlp-mapper.handler.billing/portal {:middleware [#ig/ref :etlp-mapper.auth-component/require-admin-or-owner]}
 
   :etlp-mapper.auth-component/require-role-admin {:role :admin}
-  :etlp-mapper.auth-component/require-role-mapper {:role :mapper}
 
-  [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create-sql]
-  {:request {[_ title content] :ataraxy/result
-             {org-id :org/id} :identity}
+    [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create-sql]
+    {:request {[_ title content] :ataraxy/result
+               {org-id :org/id} :identity}
 
-  :sql     ["INSERT INTO mappings (title, content, organization_id) VALUES (?, ?, CAST(? AS UUID))" title content org-id]
-  :location "mappings/{id}"
-   :hrefs {:href "/mappings/{id}"}
-   :middleware [#ig/ref :etlp-mapper.auth-component/require-role-mapper]}
+    :sql     ["INSERT INTO mappings (title, content, organization_id) VALUES (?, ?, CAST(? AS UUID))" title content org-id]
+    :location "mappings/{id}"
+     :hrefs {:href "/mappings/{id}"}
+     :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
   :etlp-mapper.handler.mappings/create
   {:db #ig/ref :duct.database/sql
@@ -203,14 +207,14 @@ $$ LANGUAGE plpgsql;"]
              {org-id :org/id} :identity}
    :sql     ["SELECT * FROM mappings WHERE id = ? AND organization_id = ?::uuid" id org-id]
    :hrefs   {:href "/mappings/{id}"}
-   :middleware [#ig/ref :etlp-mapper.auth-component/require-role-mapper]}
+   :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
   [:duct.handler.sql/execute :etlp-mapper.handler.mappings/destroy-sql]
   {:request {[_ id] :ataraxy/result
              {org-id :org/id} :identity}
 
    :sql     ["DELETE FROM mappings WHERE id = ? AND organization_id = ?::uuid" id org-id]
-   :middleware [#ig/ref :etlp-mapper.auth-component/require-role-mapper]}
+   :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
   :etlp-mapper.handler.mappings/destroy
   {:db #ig/ref :duct.database/sql
@@ -220,7 +224,7 @@ $$ LANGUAGE plpgsql;"]
   {:request {[_ id content] :ataraxy/result
              {org-id :org/id} :identity}
    :sql     ["UPDATE mappings SET content = ? WHERE id = ? AND organization_id = ?::uuid" content id org-id]
-   :middleware [#ig/ref :etlp-mapper.auth-component/require-role-mapper]}
+   :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
   :etlp-mapper.handler.mappings/update
   {:db #ig/ref :duct.database/sql
@@ -231,13 +235,13 @@ $$ LANGUAGE plpgsql;"]
              {org-id :org/id} :identity}
    :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND m.organization_id = ? AND mh.organization_id = ?::uuid" id org-id org-id]
    :hrefs {:href "/mappings/{id}/_history/{txnid}"}
-   :middleware [#ig/ref :etlp-mapper.auth-component/require-role-mapper]}
+   :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
   [:duct.handler.sql/query-one :etlp-mapper.handler.mappings/traverse-history]
   {:request {[_ id version] :ataraxy/result
              {org-id :org/id} :identity}
    :sql ["SELECT mh.title, mh.content, mh.created_at, mh.updated_at, mh.txnid FROM mappings m JOIN mappings_history mh ON m.id = mh.original_id WHERE m.id = ? AND mh.txnid = ? AND m.organization_id = ? AND mh.organization_id = ?::uuid" id version org-id org-id]
-   :middleware [#ig/ref :etlp-mapper.auth-component/require-role-mapper]}}
+   :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}}
 
 
  ;:etlp-mapper/etlp {}
