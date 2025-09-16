@@ -1,0 +1,108 @@
+version: "3.9"
+name: mapify-integration
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: mapify
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mapify"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.3
+    container_name: mapify-keycloak
+    env_file: ./env/keycloak.env
+    command: ["start-dev", "--import-realm"]
+    volumes:
+      - ./init/keycloak-realm.json:/opt/keycloak/data/import/realm-export.json:ro
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/realms/master/.well-known/openid-configuration || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    container_name: mapify-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin12345
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-07-21T05-28-08Z
+    depends_on:
+      - minio
+    entrypoint: ["/bin/sh", "-lc"]
+    command: >
+      mc alias set local http://minio:9000 admin admin12345 &&
+      mc mb -p local/mapify-dev || true &&
+      mc anonymous set download local/mapify-dev || true
+    restart: "no"
+
+  redis:
+    image: redis:7
+    container_name: mapify-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: mapify-mailhog
+    ports:
+      - "8025:8025"
+
+  integration-tests:
+    image: clojure:lein
+    working_dir: /workspace/etlp-mapper
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    volumes:
+      - ..:/workspace
+    environment:
+      JDBC_URL: jdbc:postgresql://postgres:5432/mapify?user=postgres&password=postgres
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: mapify
+      KEYCLOAK_CLIENT_ID: mapify-api
+      KEYCLOAK_CLIENT_SECRET: dev-local-not-for-prod
+      OIDC_ISSUER: http://keycloak:8080/realms/mapify
+      OIDC_AUDIENCE: mapify-api
+      OIDC_JWKS_URI: http://keycloak:8080/realms/mapify/protocol/openid-connect/certs
+      APP_SECRET: integration-secret
+      INVITE_TTL_DAYS: "7"
+      LEIN_ROOT: "1"
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["./integration/run-tests.sh"]
+
+volumes:
+  postgres-data:
+  minio-data:

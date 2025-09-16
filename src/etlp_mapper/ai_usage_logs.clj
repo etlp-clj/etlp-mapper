@@ -28,6 +28,14 @@
   (find-usage-for-org [{db :spec} org-id]
     (find-usage-for-org* db org-id))
   (log-usage [{db :spec} data]
+    (log-usage* db data))
+
+  clojure.lang.IPersistentMap
+  (find-usage [db org-id id]
+    (find-usage* db org-id id))
+  (find-usage-for-org [db org-id]
+    (find-usage-for-org* db org-id))
+  (log-usage [db data]
     (log-usage* db data)))
 
 

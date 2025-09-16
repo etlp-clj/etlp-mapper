@@ -45,5 +45,17 @@
   (member? [{db :spec} org-id user-id]
     (member?* db org-id user-id))
   (has-role? [{db :spec} org-id user-id role]
+    (has-role?* db org-id user-id role))
+
+  clojure.lang.IPersistentMap
+  (find-members [db org-id]
+    (find-members* db org-id))
+  (add-member [db data]
+    (add-member* db data))
+  (remove-member [db org-id user-id]
+    (remove-member* db org-id user-id))
+  (member? [db org-id user-id]
+    (member?* db org-id user-id))
+  (has-role? [db org-id user-id role]
     (has-role?* db org-id user-id role)))
 

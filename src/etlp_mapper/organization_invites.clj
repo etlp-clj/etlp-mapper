@@ -46,11 +46,12 @@
   (first (jdbc/insert! db :organization_invites data)))
 
 (defn- update-invite* [spec {:keys [organization_id token] :as data}]
-  (jdbc/update! spec :organization_invites (dissoc data :token :organization_id)
+  (jdbc/update! spec :organization_invites (dissoc data :token :organization_id :id)
                 ["token = ? and organization_id = ?" token organization_id]))
 
 (defn- consume-invite* [db org-id token]
-  (jdbc/delete! db :organization_invites
+  (jdbc/update! db :organization_invites
+                {:status "accepted"}
                 ["token = ? and organization_id = ?" token org-id]))
 
 (extend-protocol OrganizationInvites
@@ -64,6 +65,19 @@
       (update-invite* (:spec db) data)
       (create-invite db data)))
   (consume-invite [{db :spec} org-id token]
+    (consume-invite* db org-id token)))
+
+(extend-protocol OrganizationInvites
+  clojure.lang.IPersistentMap
+  (find-invite [db org-id token]
+    (find-invite* db org-id token))
+  (create-invite [db data]
+    (create-invite* db data))
+  (upsert-invite [db {:keys [organization_id] :as data}]
+    (if (find-invite db organization_id (:token data))
+      (update-invite* db data)
+      (create-invite db data)))
+  (consume-invite [db org-id token]
     (consume-invite* db org-id token)))
 
 

@@ -5,7 +5,8 @@
             [etlp-mapper.handler.invites]
             [etlp-mapper.organization-invites :as org-invites]
             [etlp-mapper.organization-members :as org-members]
-            [etlp-mapper.audit-logs :as audit-logs]))
+            [etlp-mapper.audit-logs :as audit-logs]
+            [etlp-mapper.ai-usage-logs :as ai-usage-logs]))
 
 (deftest create-requires-admin
   (let [app (ig/init-key :etlp-mapper.handler.invites/create {:db ::db
@@ -23,16 +24,19 @@
         app (ig/init-key :etlp-mapper.handler.invites/create {:db ::db
                                                                :token {:app-secret secret}})]
     (with-redefs [org-invites/upsert-invite (fn [_ data] (reset! captured data))
-                  audit-logs/log! (fn [_ data] (reset! log-captured data))]
+                  audit-logs/log! (fn [_ data] (reset! log-captured data))
+                  ai-usage-logs/log! (fn [& _] nil)]
       (let [resp (handler/sync-default {:ataraxy/result
                                         (app {:ataraxy/result [nil "org-1"]
-                                              :body-params {:email "user@example.com"}
+                                              :body-params {:email "user@example.com"
+                                                            :role "mapper"}
                                               :identity {:user {:id "user-1"}
                                                          :roles #{:admin}}})})]
         (is (= 200 (:status resp)))
         (is (:token (:body resp)))
         (is (= "org-1" (:organization_id @captured)))
         (is (= "user@example.com" (:email @captured)))
+        (is (= "pending" (:status @captured)))
         (is (= "create-invite" (:action @log-captured)))
         (is (org-invites/verify-token secret (:token (:body resp))))))))
 
@@ -47,9 +51,11 @@
     (with-redefs [org-invites/find-invite (fn [_ t]
                                             (when (= t token)
                                               {:organization_id "org-1" :email "u@example.com"}))
-                  org-invites/consume-invite (fn [_ _] (reset! consume? true))
+                  org-invites/consume-invite (fn [_ _ _] (reset! consume? true))
+                  org-members/member? (fn [_ _ _] false)
                   org-members/add-member (fn [_ data] (reset! add-captured data))
-                  audit-logs/log! (fn [_ data] (reset! log-captured data))]
+                  audit-logs/log! (fn [_ data] (reset! log-captured data))
+                  ai-usage-logs/log! (fn [& _] nil)]
       (let [resp (handler/sync-default {:ataraxy/result
                                         (app {:body-params {:token token}
                                               :identity {:user {:id "user-1"}}})})]

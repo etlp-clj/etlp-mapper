@@ -9,10 +9,12 @@
              [ring.util.http-response :as http])
   (:import (com.auth0.jwt JWT)
            (com.auth0.jwt.algorithms Algorithm)
-           (com.auth0.jwk JwkProviderBuilder)
            (com.auth0.jwt.exceptions JWTVerificationException)
+           (com.auth0.jwt.interfaces DecodedJWT JWTVerifier Verification)
+           (com.auth0.jwk Jwk JwkProvider JwkProviderBuilder)
            (java.net URL)
-           (java.nio.charset StandardCharsets)
+           (java.nio.charset Charset StandardCharsets)
+           (java.security.interfaces RSAPublicKey)
            (java.util Base64)
            (java.util.concurrent TimeUnit)))
 
@@ -25,10 +27,11 @@
 
 (defn- decode-claims
   "Decode the claims map from a verified JWT."
-  [decoded]
-  (let [payload (.getPayload decoded)
-        bytes   (.decode (Base64/getUrlDecoder) payload)]
-    (json/parse-string (String. bytes StandardCharsets/UTF_8) true)))
+  [^DecodedJWT decoded]
+  (let [^String payload (.getPayload decoded)
+        ^java.util.Base64$Decoder decoder (Base64/getUrlDecoder)
+        ^"[B" bytes (.decode decoder payload)]
+    (json/parse-string (String. bytes ^Charset StandardCharsets/UTF_8) true)))
 
 (defn- unauthorized
   [message]
@@ -47,20 +50,22 @@
   [issuer audience jwks-uri]
   (if (nil? jwks-uri)
     (throw (ex-info "JWKS URI must be configured" {:issuer issuer :audience audience}))
-    (let [provider (-> (JwkProviderBuilder. (URL. jwks-uri))
-                      (.cached 10 24 TimeUnit/HOURS)
-                      .build)]
-      (fn [token]
-        (let [jwt   (JWT/decode token)
+    (let [^JwkProvider provider (-> (JwkProviderBuilder. (URL. jwks-uri))
+                                    (.cached 10 24 TimeUnit/HOURS)
+                                    .build)]
+      (fn [^String token]
+        (let [^DecodedJWT jwt (JWT/decode token)
               kid   (.getKeyId jwt)
-              jwk   (.get provider kid)
-              pub   (.getPublicKey jwk)
-              algo  (Algorithm/RSA256 pub nil)
-              verifier (-> (JWT/require algo)
-                           (.withIssuer issuer)
-                           (.withAudience (into-array String [audience]))
-                           .build)]
-          (.verify verifier token))))))
+              ^Jwk jwk (.get provider kid)
+              ^RSAPublicKey pub (.getPublicKey jwk)
+              ^Algorithm algo  (Algorithm/RSA256 pub nil)
+              ^Verification builder (JWT/require algo)
+              ^"[Ljava.lang.String;" issuer-array (into-array String [issuer])
+              ^"[Ljava.lang.String;" audience-array (into-array String [audience])]
+          (.withIssuer builder issuer-array)
+          (.withAudience builder audience-array)
+          (let [^JWTVerifier verifier (.build builder)]
+            (.verify ^JWTVerifier verifier ^String token)))))))
 
 
 (defn- upsert-user!
@@ -112,7 +117,10 @@
                   name    (:name claims)
                   user    (upsert-user! db {:idp-sub idp-sub :email email :name name})
                   req-org (get-in req [:headers "x-org-id"])
-                  org-id  (or req-org (:last_used_org_id user))
+                  claim-org (or (:org_id claims)
+                                (:org-id claims)
+                                (:org/id claims))
+                  org-id  (or req-org (:last_used_org_id user) claim-org)
                   _       (when req-org (update-last-org! db (:id user) org-id))
                   roles   (let [token-roles (:roles claims)]
                             (if (seq token-roles)

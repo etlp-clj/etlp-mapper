@@ -96,6 +96,45 @@ But you can also run tests through Leiningen.
 lein test
 ```
 
+#### Validation Harness
+
+Static and contract checks can be exercised locally without external
+services:
+
+```sh
+lein check
+lein clj-kondo-lint
+lein eastwood {:config-files ["eastwood.clj"]}
+lein test
+```
+
+The additional linting configuration lives in `.clj-kondo/` and warns when
+`jdbc/query` calls omit organization scoping, while the `validation/*`
+tests exercise the authentication, RBAC and migration invariants with
+Ring stubs.
+
+### Dockerised Integration Testing Suite
+
+For an end-to-end verification of the multi-tenancy workflows against live
+dependencies (Postgres, Keycloak, Minio, Redis and Mailhog), use the bundled
+Docker Compose scenario.
+
+```sh
+cd integration
+docker compose up --build integration-tests
+```
+
+The command builds the required containers, applies Ragtime migrations, and
+runs both the unit test suite and integration checks (`lein test :integration`).
+When the tests complete, tear everything down with:
+
+```sh
+docker compose down -v
+```
+
+The Keycloak admin credentials and realm seed live under `integration/env` and
+`integration/init`, making the suite self-contained for CI usage.
+
 ### OIDC Authentication
 
 The service secures endpoints using Keycloak OIDC. Configure the following

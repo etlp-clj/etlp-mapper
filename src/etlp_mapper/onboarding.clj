@@ -37,14 +37,14 @@
                 idp-sub email name])))
 
 (defn- insert-org!
-  [tx name]
+  [tx {:keys [name created-user-id]}]
   (let [id (str (java.util.UUID/randomUUID))]
     (:id
      (first
       (jdbc/query tx
-                  [(str "insert into organizations (id,name) values (?::uuid, ?) "
-                        "on conflict (name) do update set name=excluded.name returning id")
-                   id name])))))
+                  [(str "insert into organizations (id,name,created_user_id) values (?::uuid, ?, ?::uuid) "
+                        "on conflict (name) do update set name=excluded.name, created_user_id=excluded.created_user_id returning id")
+                   id name created-user-id])))))
 
 (defn- ensure-membership!
   [tx org-id user-id]
@@ -67,9 +67,11 @@
   [db kc {:keys [name user]}]
   (jdbc/with-db-transaction [tx db]
     (let [user-row (upsert-user! tx user)
-          org-id   (insert-org! tx name)]
+          org-id   (insert-org! tx {:name name :created-user-id (:id user-row)})]
       (ensure-membership! tx org-id (:id user-row))
       (ensure-subscription! tx org-id)
+      (jdbc/update! tx :users {:last_used_org_id org-id}
+                    ["id = ?" (:id user-row)])
       (audit-logs/log! tx {:org-id org-id
                            :user-id (:id user-row)
                            :action "create-organization"})

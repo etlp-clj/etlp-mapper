@@ -3,6 +3,8 @@
             [clojure.java.jdbc :as jdbc]
             [integrant.core :as ig]
             [ataraxy.response :as response]
+            [etlp-mapper.audit-logs :as audit-logs]
+            [etlp-mapper.ai-usage-logs :as ai-usage-logs]
             ;; ensure handler namespace is loaded for init-key method
             [etlp-mapper.handler.me]))
 
@@ -10,7 +12,9 @@
   (let [update-capture (atom nil)
         handler (ig/init-key :etlp-mapper.handler.me/set-active-org {:db {:spec ::db}})]
     (with-redefs [jdbc/query (fn [_ _] [{:organization_id "org-1"}])
-                  jdbc/update! (fn [& args] (reset! update-capture args))]
+                  jdbc/update! (fn [& args] (reset! update-capture args))
+                  audit-logs/log! (fn [& _] nil)
+                  ai-usage-logs/log! (fn [& _] nil)]
       (let [resp (handler {:identity {:user {:id 1}}
                            :body-params {:org_id "org-1"}})]
         (is (= [::response/ok {:org_id "org-1"}] resp))
@@ -21,7 +25,9 @@
   (let [update-called? (atom false)
         handler (ig/init-key :etlp-mapper.handler.me/set-active-org {:db {:spec ::db}})]
     (with-redefs [jdbc/query (fn [_ _] [])
-                  jdbc/update! (fn [& _] (reset! update-called? true))]
+                  jdbc/update! (fn [& _] (reset! update-called? true))
+                  audit-logs/log! (fn [& _] nil)
+                  ai-usage-logs/log! (fn [& _] nil)]
       (let [resp (handler {:identity {:user {:id 1}}
                            :body-params {:org_id "org-1"}})]
         (is (= ::response/forbidden (first resp)))
