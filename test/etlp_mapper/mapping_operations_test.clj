@@ -1,6 +1,6 @@
 (ns etlp-mapper.mapping-operations-test
-  (:require [clojure.test :refer :all]
-            [ataraxy.response :as response]
+  (:require [ataraxy.response :as response]
+            [clojure.test :refer :all]
             [ring.util.http-response :as http]
             [etlp-mapper.auth :as auth]
             [integrant.core :as ig]

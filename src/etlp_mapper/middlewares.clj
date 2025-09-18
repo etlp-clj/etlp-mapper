@@ -1,9 +1,8 @@
 (ns etlp-mapper.middlewares
-  (:require
-    [ring.middleware.cors :refer [wrap-cors]]
-   [ataraxy.core :as ataraxy]
-   [ataraxy.response :as response]
-   [integrant.core :as ig]))
+  (:require [ataraxy.response :as response]
+            [ataraxy.core :as ataraxy]
+            [integrant.core :as ig]
+            [ring.middleware.cors :refer [wrap-cors]]))
 
 (defn dead-cors-middleware
 
