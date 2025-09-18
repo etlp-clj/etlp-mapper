@@ -18,7 +18,7 @@
   (doseq [file (clj-files)
           :when (not (skip-files file))]
     (let [content (slurp file)]
-      (doseq [[_ sql] (re-seq #"jdbc/query[^\[]*\[\s*\"([^"]+)" content)]
+      (doseq [[_ sql] (re-seq #"jdbc/query[^\[]*\[\s*\"([^\"]+)\"" content)]
         (let [upper (str/upper-case sql)]
           (when (and (str/includes? upper "SELECT")
                      (not (re-find #"ORGANIZATION_ID" upper)))
