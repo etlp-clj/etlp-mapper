@@ -1,6 +1,5 @@
 (ns etlp-mapper.handler.invites
-  (:require [ataraxy.response :as response]
-            [integrant.core :as ig]
+  (:require [integrant.core :as ig]
             [etlp-mapper.audit-logs :as audit-logs]
             [etlp-mapper.identity :as identity]
             [etlp-mapper.ai-usage-logs :as ai-usage-logs]
@@ -9,7 +8,7 @@
   (:import (java.time Instant)
            (java.time.temporal ChronoUnit)
            (java.util UUID)
-           (java.sql Timestamp))
+           (java.sql Timestamp)))
 
 (defn- admin-role? [roles]
   (some #{:owner :admin} roles))
@@ -39,19 +38,19 @@
           invite-role (or role "mapper")]
       (cond
         (nil? org-id)
-        [::response/forbidden {:error "Organization context required"}]
+        [:ataraxy.response/forbidden {:error "Organization context required"}]
 
         (not= path-org org-id)
-        [::response/forbidden {:error "Organization mismatch"}]
+        [:ataraxy.response/forbidden {:error "Organization mismatch"}]
 
         (nil? user-id)
-        [::response/forbidden {:error "User context required"}]
+        [:ataraxy.response/forbidden {:error "User context required"}]
 
         (not (admin-role? roles))
-        [::response/forbidden {:error "Insufficient role"}]
+        [:ataraxy.response/forbidden {:error "Insufficient role"}]
 
         (not (seq email))
-        [::response/bad-request {:error "Invite email required"}]
+        [:ataraxy.response/bad-request {:error "Invite email required"}]
 
         :else
         (let [token-value (org-invites/sign-token secret {:org-id org-id
@@ -76,7 +75,7 @@
                                   :feature-type "invite"
                                   :input-tokens 0
                                   :output-tokens 0})
-          [::response/ok {:org_id org-id :token token-value}])))))
+          [:ataraxy.response/ok {:org_id org-id :token token-value}])))))
 
 ;; POST /invites/accept – verify an invite token and add the user to the
 ;; organisation membership list.
@@ -92,25 +91,25 @@
           invite    (when org-id (org-invites/find-invite db org-id token))]
       (cond
         (nil? token)
-        [::response/bad-request {:error "Invalid token"}]
+        [:ataraxy.response/bad-request {:error "Invalid token"}]
 
         (nil? claims)
-        [::response/bad-request {:error "Invalid token"}]
+        [:ataraxy.response/bad-request {:error "Invalid token"}]
 
         (nil? org-id)
-        [::response/forbidden {:error "Organization context required"}]
+        [:ataraxy.response/forbidden {:error "Organization context required"}]
 
         (and claim-org (not= claim-org org-id))
-        [::response/forbidden {:error "Organization mismatch"}]
+        [:ataraxy.response/forbidden {:error "Organization mismatch"}]
 
         (and org_id (not= org_id org-id))
-        [::response/forbidden {:error "Organization mismatch"}]
+        [:ataraxy.response/forbidden {:error "Organization mismatch"}]
 
         (nil? user-id)
-        [::response/forbidden {:error "User context required"}]
+        [:ataraxy.response/forbidden {:error "User context required"}]
 
         (nil? invite)
-        [::response/bad-request {:error "Invite not found"}]
+        [:ataraxy.response/bad-request {:error "Invite not found"}]
 
         :else
         (do
@@ -128,4 +127,4 @@
                                   :feature-type "invite"
                                   :input-tokens 0
                                   :output-tokens 0})
-          [::response/ok {:org_id org-id :token token :status "accepted"}])))))
+          [:ataraxy.response/ok {:org_id org-id :token token :status "accepted"}])))))

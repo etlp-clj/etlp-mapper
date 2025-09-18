@@ -1,7 +1,7 @@
 (ns etlp-mapper.handler.whoami-test
-  (:require [clojure.test :refer :all]
+  (:require [ataraxy.response :as response]
+            [clojure.test :refer :all]
             [integrant.core :as ig]
-            [ataraxy.response :as response]
             [etlp-mapper.handler.whoami]))
 
 (deftest whoami-reads-identity

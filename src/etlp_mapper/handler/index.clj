@@ -1,6 +1,6 @@
 (ns etlp-mapper.handler.index
-  (:require [ataraxy.core :as ataraxy]
-            [ataraxy.response :as response]
+  (:require [ataraxy.response :as response]
+            [ataraxy.core :as ataraxy]
             [integrant.core :as ig]))
 
 (defmethod ig/init-key :etlp-mapper.handler/index [_ _]

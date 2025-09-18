@@ -1,8 +1,8 @@
 (ns etlp-mapper.handler.me-test
-  (:require [clojure.test :refer :all]
+  (:require [ataraxy.response :as response]
             [clojure.java.jdbc :as jdbc]
+            [clojure.test :refer :all]
             [integrant.core :as ig]
-            [ataraxy.response :as response]
             [etlp-mapper.audit-logs :as audit-logs]
             [etlp-mapper.ai-usage-logs :as ai-usage-logs]
             ;; ensure handler namespace is loaded for init-key method
