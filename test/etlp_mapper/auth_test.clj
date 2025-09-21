@@ -36,18 +36,21 @@
   (let [{:keys [token verifier]} (gen-token {:sub "sub-1" :email "u@example" :name "User"})
         handler (fn [req] (http/ok (get req :identity)))
         upsert (fn [_ _] {:id 1 :email "u@example" :idp_sub "sub-1" :last_used_org_id nil})
-        roles  (fn [_ _ _] ["admin"])]
-    (with-redefs [auth/upsert-user! upsert
-                  auth/load-user-roles roles
-                  auth/update-last-org! (fn [_ _ _])]
-      (let [app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier :db ::db})
-                 ((auth/wrap-require-org) handler))
-            resp (app {:headers {"authorization" (str "Bearer " token)
-                                 "x-org-id" "org-1"}})]
-        (is (= 200 (:status resp)))
-        (is (= "org-1" (get-in resp [:body :org/id])))
-        (is (= #{:admin} (get-in resp [:body :roles])))
-        (is (= "sub-1" (get-in resp [:body :claims :sub])))))))
+        roles  (fn [_ _ _] ["admin"])
+        app ((auth/wrap-auth {:issuer issuer
+                              :audience audience
+                              :verifier verifier
+                              :db ::db
+                              :upsert-user! upsert
+                              :load-user-roles roles
+                              :update-last-org! (fn [_ _ _])})
+             ((auth/wrap-require-org) handler))
+        resp (app {:headers {"authorization" (str "Bearer " token)
+                             "x-org-id" "org-1"}})]
+    (is (= 200 (:status resp)))
+    (is (= "org-1" (get-in resp [:body :org/id])))
+    (is (= #{:admin} (get-in resp [:body :roles])))
+    (is (= "sub-1" (get-in resp [:body :claims :sub])))))
 
 (deftest jwt-missing-org
   (let [{:keys [token verifier]} (gen-token {:sub "s" :email "e" :name "n"})
@@ -55,15 +58,18 @@
         handler (fn [_]
                   (reset! called true)
                   (http/ok))
-        upsert (fn [_ _] {:id 1 :email "e" :idp_sub "s" :last_used_org_id nil})]
-    (with-redefs [auth/upsert-user! upsert
-                  auth/load-user-roles (fn [& _] [])
-                  auth/update-last-org! (fn [_ _ _])]
-      (let [app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier :db ::db})
-                 ((auth/wrap-require-org) handler))
-            resp (app {:headers {"authorization" (str "Bearer " token)}})]
-        (is (= 403 (:status resp)))
-        (is (false? @called))))))
+        upsert (fn [_ _] {:id 1 :email "e" :idp_sub "s" :last_used_org_id nil})
+        app ((auth/wrap-auth {:issuer issuer
+                              :audience audience
+                              :verifier verifier
+                              :db ::db
+                              :upsert-user! upsert
+                              :load-user-roles (fn [& _] [])
+                              :update-last-org! (fn [_ _ _])})
+             ((auth/wrap-require-org) handler))
+        resp (app {:headers {"authorization" (str "Bearer " token)}})]
+    (is (= 403 (:status resp)))
+    (is (false? @called))))
 
 (deftest jwt-invalid
   (let [{:keys [token]} (gen-token {:org_id "org-1"})
@@ -87,14 +93,18 @@
 (deftest jwt-db-error
   (let [{:keys [token verifier]} (gen-token {:sub "s" :email "e" :name "n"})
         handler (fn [_] (http/ok))
-        failing-upsert (fn [_ _] (throw (IllegalArgumentException. "db-spec null is missing a required parameter")))]
-    (with-redefs [auth/upsert-user! failing-upsert
-                  auth/load-user-roles (fn [& _] [])
-                  auth/update-last-org! (fn [& _] nil)]
-      (let [app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier :db ::db}) handler)
-            resp (app {:headers {"authorization" (str "Bearer " token)}})]
-        (is (= 500 (:status resp)))
-        (is (= "db-spec null is missing a required parameter" (get-in resp [:body :error])))))))
+        failing-upsert (fn [_ _] (throw (IllegalArgumentException. "db-spec null is missing a required parameter")))
+        app ((auth/wrap-auth {:issuer issuer
+                              :audience audience
+                              :verifier verifier
+                              :db ::db
+                              :upsert-user! failing-upsert
+                              :load-user-roles (fn [& _] [])
+                              :update-last-org! (fn [& _] nil)})
+             handler)
+        resp (app {:headers {"authorization" (str "Bearer " token)}})]
+    (is (= 500 (:status resp)))
+    (is (= "db-spec null is missing a required parameter" (get-in resp [:body :error])))))
 
 (deftest route-protection
   (let [handler (fn [_] (http/ok))

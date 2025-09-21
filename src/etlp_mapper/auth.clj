@@ -101,11 +101,16 @@
 
   Options: `:issuer`, `:audience`, `:jwks-uri`, `:db`.  For testing a
   custom `:verifier` function may be supplied which should return a
-  `DecodedJWT` when given a token."
-  [{:keys [issuer audience jwks-uri verifier db]}]
+  `DecodedJWT` when given a token.  The default database helpers may be
+  overridden via `:upsert-user!`, `:update-last-org!` and
+  `:load-user-roles`."
+  [{:keys [issuer audience jwks-uri verifier db] :as opts}]
   (when (nil? db)
     (throw (ex-info "Database connection must be configured" {})))
-  (let [verify (or verifier (build-verifier issuer audience jwks-uri))]
+  (let [verify (or verifier (build-verifier issuer audience jwks-uri))
+        upsert-user! (or (:upsert-user! opts) upsert-user!)
+        update-last-org! (or (:update-last-org! opts) update-last-org!)
+        load-user-roles (or (:load-user-roles opts) load-user-roles)]
     (fn [handler]
       (fn [req]
         (if-let [token (bearer-token req)]
