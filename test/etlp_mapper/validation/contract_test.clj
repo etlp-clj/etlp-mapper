@@ -33,7 +33,7 @@
 
 (deftest unauthorized-when-missing-authorization
   (let [handler (fn [_] (http/ok))
-        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil) :db ::db})
+        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil) :db {:spec ::db}})
              ((auth/wrap-require-org) handler))
         resp (app (mock/request :get "/mappings"))]
     (is (= 401 (:status resp)))))
@@ -46,7 +46,7 @@
         app ((auth/wrap-auth {:issuer issuer
                               :audience audience
                               :verifier verifier
-                              :db ::db
+                              :db {:spec ::db}
                               :upsert-user! upsert
                               :load-user-roles roles
                               :update-last-org! (fn [& _] nil)})
@@ -66,7 +66,7 @@
         app ((auth/wrap-auth {:issuer issuer
                               :audience audience
                               :verifier verifier
-                              :db ::db
+                              :db {:spec ::db}
                               :upsert-user! upsert
                               :load-user-roles (fn [& _] [])
                               :update-last-org! (fn [& _] nil)})

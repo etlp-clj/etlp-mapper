@@ -40,7 +40,7 @@
         app ((auth/wrap-auth {:issuer issuer
                               :audience audience
                               :verifier verifier
-                              :db ::db
+                              :db {:spec ::db}
                               :upsert-user! upsert
                               :load-user-roles roles
                               :update-last-org! (fn [_ _ _])})
@@ -62,7 +62,7 @@
         app ((auth/wrap-auth {:issuer issuer
                               :audience audience
                               :verifier verifier
-                              :db ::db
+                              :db {:spec ::db}
                               :upsert-user! upsert
                               :load-user-roles (fn [& _] [])
                               :update-last-org! (fn [_ _ _])})
@@ -84,7 +84,7 @@
                              .build
                              (.verify t))))
         handler (fn [_] (http/ok))
-        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier bad-verifier :db ::db})
+        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier bad-verifier :db {:spec ::db}})
              ((auth/wrap-require-org) handler))
         resp (app {:headers {"authorization" (str "Bearer " token)}})]
     (is (= 401 (:status resp)))
@@ -97,7 +97,7 @@
         app ((auth/wrap-auth {:issuer issuer
                               :audience audience
                               :verifier verifier
-                              :db ::db
+                              :db {:spec ::db}
                               :upsert-user! failing-upsert
                               :load-user-roles (fn [& _] [])
                               :update-last-org! (fn [& _] nil)})
@@ -108,7 +108,7 @@
 
 (deftest route-protection
   (let [handler (fn [_] (http/ok))
-        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil) :db ::db})
+        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier (constantly nil) :db {:spec ::db}})
              ((auth/wrap-require-org) handler))
         resp (app {})]
     (is (= 401 (:status resp)))))
@@ -116,7 +116,7 @@
 (deftest jwks-uri-required
   (is (thrown-with-msg? clojure.lang.ExceptionInfo
                         #"JWKS URI must be configured"
-                        (auth/wrap-auth {:issuer issuer :audience audience :db ::db}))))
+                        (auth/wrap-auth {:issuer issuer :audience audience :db {:spec ::db}}))))
 
 (deftest db-required
   (is (thrown-with-msg? clojure.lang.ExceptionInfo

@@ -139,8 +139,8 @@
       (is (= "transform" (:feature_type @captured))))))
 
 (deftest invite-handlers-require-organization-context
-  (let [create-handler (ig/init-key :etlp-mapper.handler.invites/create {:db ::db})
-        accept-handler (ig/init-key :etlp-mapper.handler.invites/accept {:db ::db})]
+  (let [create-handler (ig/init-key :etlp-mapper.handler.invites/create {:db {:spec ::db}})
+        accept-handler (ig/init-key :etlp-mapper.handler.invites/accept {:db {:spec ::db}})]
     (testing "create invite rejects missing organization"
       (is (= [::response/forbidden {:error "Organization context required"}]
              (create-handler {:ataraxy/result [::create "org-1"]

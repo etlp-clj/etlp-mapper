@@ -66,8 +66,6 @@
           (.withAudience builder audience-array)
           (let [^JWTVerifier verifier (.build builder)]
             (.verify ^JWTVerifier verifier ^String token)))))))
-
-
 (defn- upsert-user!
   "Insert or update a user record and return the stored row."
   [{db :spec} {:keys [idp-sub email name]}]
