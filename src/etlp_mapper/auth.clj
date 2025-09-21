@@ -101,11 +101,16 @@
 
   Options: `:issuer`, `:audience`, `:jwks-uri`, `:db`.  For testing a
   custom `:verifier` function may be supplied which should return a
-  `DecodedJWT` when given a token."
-  [{:keys [issuer audience jwks-uri verifier db]}]
+  `DecodedJWT` when given a token.  The default database helpers may be
+  overridden via `:upsert-user!`, `:update-last-org!` and
+  `:load-user-roles`."
+  [{:keys [issuer audience jwks-uri verifier db] :as opts}]
   (when (nil? db)
     (throw (ex-info "Database connection must be configured" {})))
-  (let [verify (or verifier (build-verifier issuer audience jwks-uri))]
+  (let [verify (or verifier (build-verifier issuer audience jwks-uri))
+        upsert-user-fn (get opts :upsert-user! upsert-user!)
+        update-last-org-fn (get opts :update-last-org! update-last-org!)
+        load-user-roles-fn (get opts :load-user-roles load-user-roles)]
     (fn [handler]
       (fn [req]
         (if-let [token (bearer-token req)]
@@ -115,18 +120,18 @@
                   idp-sub (:sub claims)
                   email   (:email claims)
                   name    (:name claims)
-                  user    (upsert-user! db {:idp-sub idp-sub :email email :name name})
+                  user    (upsert-user-fn db {:idp-sub idp-sub :email email :name name})
                   req-org (get-in req [:headers "x-org-id"])
                   claim-org (or (:org_id claims)
                                 (:org-id claims)
                                 (:org/id claims))
                   org-id  (or req-org (:last_used_org_id user) claim-org)
-                  _       (when req-org (update-last-org! db (:id user) org-id))
+                  _       (when req-org (update-last-org-fn db (:id user) org-id))
                   roles   (let [token-roles (:roles claims)]
                             (if (seq token-roles)
                               (set (map keyword token-roles))
                               (if (and org-id (:id user))
-                                (->> (load-user-roles db (:id user) org-id)
+                                (->> (load-user-roles-fn db (:id user) org-id)
                                      (map keyword)
                                      set)
                                 #{})))
@@ -142,7 +147,6 @@
             (catch JWTVerificationException _
               (unauthorized "Invalid token"))
             (catch Exception e
-              (println e)
               (http/internal-server-error {:error (.getMessage e)})))
           (unauthorized "Invalid token"))))))
 

@@ -43,12 +43,15 @@
         handler (fn [req] (http/ok (get-in req [:identity :roles])))
         upsert (fn [_ _] {:id "user-1" :email "user@example.com" :idp_sub "sub" :last_used_org_id nil})
         roles  (fn [& _] ["editor"])
-        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier :db ::db})
+        app ((auth/wrap-auth {:issuer issuer
+                              :audience audience
+                              :verifier verifier
+                              :db ::db
+                              :upsert-user! upsert
+                              :load-user-roles roles
+                              :update-last-org! (fn [& _] nil)})
              ((auth/wrap-require-org) handler))]
-    (with-redefs [auth/upsert-user! upsert
-                  auth/load-user-roles roles
-                  auth/update-last-org! (fn [& _] nil)
-                  audit-logs/log! (fn [& _] nil)
+    (with-redefs [audit-logs/log! (fn [& _] nil)
                   ai-usage-logs/log! (fn [& _] nil)]
       (let [resp (app (-> (mock/request :get "/mappings")
                           (mock/header "authorization" (str "Bearer " token))
@@ -60,13 +63,16 @@
   (let [{:keys [token verifier]} (token-with-claims {:sub "user-1" :email "user@example.com"})
         handler (fn [_] (http/ok))
         upsert (fn [_ _] {:id "user-1" :email "user@example.com" :idp_sub "sub" :last_used_org_id nil})
-        app ((auth/wrap-auth {:issuer issuer :audience audience :verifier verifier :db ::db})
+        app ((auth/wrap-auth {:issuer issuer
+                              :audience audience
+                              :verifier verifier
+                              :db ::db
+                              :upsert-user! upsert
+                              :load-user-roles (fn [& _] [])
+                              :update-last-org! (fn [& _] nil)})
              ((auth/wrap-require-org) handler))]
-    (with-redefs [auth/upsert-user! upsert
-                  auth/load-user-roles (fn [& _] [])
-                  auth/update-last-org! (fn [& _] nil)]
-      (let [resp (app (mock/header (mock/request :get "/mappings") "authorization" (str "Bearer " token)))]
-        (is (= 403 (:status resp)))))))
+    (let [resp (app (mock/header (mock/request :get "/mappings") "authorization" (str "Bearer " token)))]
+      (is (= 403 (:status resp))))))
 
 (deftest role-guard-contract
   (let [handler (fn [_] (http/ok))
