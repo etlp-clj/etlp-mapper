@@ -9,7 +9,7 @@
             [etlp-mapper.ai-usage-logs :as ai-usage-logs]))
 
 (deftest create-requires-admin
-  (let [app (ig/init-key :etlp-mapper.handler.invites/create {:db ::db
+  (let [app (ig/init-key :etlp-mapper.handler.invites/create {:db {:spec ::db}
                                                               :token {:app-secret "s"}})
         resp (app {:ataraxy/result [nil "org-1"]
                    :body-params {:email "user@example.com"}
@@ -21,7 +21,7 @@
   (let [secret "s"
         captured (atom nil)
         log-captured (atom nil)
-        app (ig/init-key :etlp-mapper.handler.invites/create {:db ::db
+        app (ig/init-key :etlp-mapper.handler.invites/create {:db {:spec ::db}
                                                                :token {:app-secret secret}})]
     (with-redefs [org-invites/upsert-invite (fn [_ data] (reset! captured data))
                   audit-logs/log! (fn [_ data] (reset! log-captured data))
@@ -46,7 +46,7 @@
         add-captured (atom nil)
         consume? (atom false)
         log-captured (atom nil)
-        app (ig/init-key :etlp-mapper.handler.invites/accept {:db ::db
+        app (ig/init-key :etlp-mapper.handler.invites/accept {:db {:spec ::db}
                                                               :token {:app-secret secret}})]
     (with-redefs [org-invites/find-invite (fn [_ t]
                                             (when (= t token)
