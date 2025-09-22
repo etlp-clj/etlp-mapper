@@ -1,0 +1,534 @@
+openapi: 3.0.3
+info:
+  title: ETLP Mapper API
+  version: 1.0.0
+  description: |
+    Contract for the ETLP Mapper service covering onboarding, invitations, organization
+    management, billing portal access, and mapping lifecycle operations.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    OrgIdHeader:
+      name: X-Org-Id
+      in: header
+      description: >-
+        Optional organization identifier. When supplied, the backend switches the active
+        organization for the duration of the request and persists it as the user's last
+        used organization.
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    Mapping:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: object
+        organization_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - organization_id
+    MappingHistory:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        txnid:
+          type: string
+      required:
+        - title
+        - txnid
+paths:
+  /:
+    get:
+      summary: Health check
+      description: Returns a static payload confirming the service is reachable.
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                required:
+                  - message
+  /whoami:
+    get:
+      summary: Inspect the authenticated identity
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrgIdHeader'
+      responses:
+        '200':
+          description: Current user identity, roles, and active organization.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    nullable: true
+                    description: Claims captured from the Keycloak token.
+                  org_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  roles:
+                    type: array
+                    items:
+                      type: string
+                required:
+                  - roles
+  /orgs:
+    post:
+      summary: Create an organization for the caller
+      description: >-
+        Creates a new organization, assigns the caller as owner, provisions the default
+        subscription, logs the onboarding event, and marks the organization as active for
+        the user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+      responses:
+        '200':
+          description: Organization successfully provisioned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  org_id:
+                    type: string
+                    format: uuid
+                required:
+                  - org_id
+        '400':
+          description: Missing or invalid payload.
+        '403':
+          description: Organization already selected or user missing.
+  /orgs/{org_id}/invites:
+    post:
+      summary: Issue an invitation for an organization member
+      description: Generates a signed invite token and stores it for later redemption.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: org_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/OrgIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  description: Role to grant the invitee. Defaults to `mapper`.
+                ttl_minutes:
+                  type: integer
+                  description: Minutes before the invite expires. Defaults to 60.
+              required:
+                - email
+      responses:
+        '200':
+          description: Invitation successfully created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                required:
+                  - token
+        '400':
+          description: Missing email or invalid organization.
+        '403':
+          description: Authorization failure or missing organization context.
+  /invites/accept:
+    post:
+      summary: Accept an invitation token
+      description: Validates the invite and adds the authenticated user to the organization.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrgIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                org_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Optional organization identifier to assert during acceptance.
+              required:
+                - token
+      responses:
+        '200':
+          description: Invitation accepted and membership created if needed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  org_id:
+                    type: string
+                    format: uuid
+                  token:
+                    type: string
+                  status:
+                    type: string
+                    enum: [accepted]
+                required:
+                  - org_id
+                  - token
+                  - status
+        '400':
+          description: Invalid token or invite not found.
+        '403':
+          description: Organization mismatch or user context missing.
+  /me/active-org:
+    post:
+      summary: Set the active organization for the user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                org_id:
+                  type: string
+                  format: uuid
+                  description: If omitted, the current organization context is reused.
+      responses:
+        '200':
+          description: Active organization persisted for the user.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  org_id:
+                    type: string
+                    format: uuid
+                required:
+                  - org_id
+        '400':
+          description: Missing organization identifier.
+        '403':
+          description: User not authenticated or not a member of the organization.
+  /billing/portal:
+    post:
+      summary: Retrieve the billing portal URL for the active organization
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrgIdHeader'
+      responses:
+        '200':
+          description: Link to the third-party billing portal.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+                  org_id:
+                    type: string
+                    format: uuid
+                required:
+                  - url
+                  - org_id
+        '403':
+          description: Missing organization context or insufficient privileges.
+  /mappings:
+    get:
+      summary: List mappings for the active organization
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrgIdHeader'
+      responses:
+        '200':
+          description: Collection of mapping definitions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Mapping'
+    post:
+      summary: Create a mapping definition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrgIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: object
+                  description: Arbitrary JSON payload representing the mapping content.
+              required:
+                - title
+                - content
+      responses:
+        '201':
+          description: Mapping created.
+          headers:
+            Location:
+              description: URL of the created mapping resource.
+              schema:
+                type: string
+        '400':
+          description: Invalid payload.
+  /mappings/{id}:
+    get:
+      summary: Fetch a single mapping
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/OrgIdHeader'
+      responses:
+        '200':
+          description: Mapping payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mapping'
+        '404':
+          description: Mapping not found for the organization.
+    put:
+      summary: Replace mapping content
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/OrgIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: object
+              required:
+                - content
+      responses:
+        '204':
+          description: Mapping updated.
+    delete:
+      summary: Remove a mapping
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/OrgIdHeader'
+      responses:
+        '204':
+          description: Mapping deleted.
+  /mappings/{id}/apply:
+    post:
+      summary: Apply a mapping to supplied data
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/OrgIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+              required:
+                - data
+      responses:
+        '200':
+          description: Transformation result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    description: Output from executing the stored mapping.
+                    nullable: true
+                  'org/id':
+                    type: string
+                    format: uuid
+  /mappings/{id}/_history:
+    get:
+      summary: Retrieve mapping history entries
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/OrgIdHeader'
+      responses:
+        '200':
+          description: List of historical mapping snapshots ordered by transaction.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MappingHistory'
+  /mappings/{id}/_history/{version}:
+    get:
+      summary: Retrieve a specific historical version
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Transaction identifier recorded in the mapping history.
+        - $ref: '#/components/parameters/OrgIdHeader'
+      responses:
+        '200':
+          description: Historical snapshot for the mapping.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MappingHistory'
+        '404':
+          description: Version not found.
+  /mappings/test:
+    post:
+      summary: Execute a mapping template without persisting it
+      description: >-
+        Accepts a YAML payload containing a `template` definition and `scope` data. The
+        service compiles the template, applies it to the scope, and returns the rendered
+        data without touching persisted mappings.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrgIdHeader'
+      requestBody:
+        required: true
+        content:
+          text/yaml:
+            schema:
+              type: string
+              description: YAML document with `template` and `scope` keys.
+          application/x-yaml:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Rendered template result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    description: Output of the ad-hoc mapping execution.
+                  'org/id':
+                    type: string
+                    format: uuid
+        '400':
+          description: Template parsing or execution failure.
