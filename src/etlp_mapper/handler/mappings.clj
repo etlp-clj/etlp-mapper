@@ -105,7 +105,7 @@
       (log-mapping-event! db org-id user-id "destroy-mapping" "mapping-delete" {:mapping-id mapping-id})
       (handler request))))
 
-(defmethod ig/init-key :etlp-mapper.handler.mappings [_ {:keys [db]}]
+(defmethod ig/init-key :etlp-mapper.handler.mappings/test [_ {:keys [db]}]
   (fn [request]
     (let [org-id (get-in request [:identity :org/id])
           user-id (identity/user-id request)]

@@ -24,7 +24,7 @@
             ^:editor [:etlp-mapper.handler/apply-mappings ^int id data]
 
             [:post "/mappings/test"]
-            ^:editor [:etlp-mapper.handler.mappings]
+            ^:editor [:etlp-mapper.handler.mappings/test]
 
             [:get    "/mappings/" id] ^:editor [:etlp-mapper.handler.mappings/find ^int id]
             [:get    "/mappings/" id "/_history"] ^:editor [:etlp-mapper.handler.mappings/history ^int id]
@@ -41,18 +41,18 @@
                  #ig/ref :etlp-mapper.migration/create-users
                  #ig/ref :etlp-mapper.migration/add-organizations-created-user
                  #ig/ref :etlp-mapper.migration/create-organization-members
-                #ig/ref :etlp-mapper.migration/create-organization-invites
-                #ig/ref :etlp-mapper.migration/create-organization-subscriptions
-                #ig/ref :etlp-mapper.migration/create-audit-logs
-                #ig/ref :etlp-mapper.migration/create-ai-usage-logs
-                #ig/ref :etlp-mapper.migration/create-mappings
-                #ig/ref :etlp-mapper.migration/create-mappings-history
-                #ig/ref :etlp-mapper.migration/insert-mapping-history
-                #ig/ref :etlp-mapper.migration/insert_mapping_history_trigger
-                #ig/ref :etlp-mapper.migration/updated-at-trigger
-                #ig/ref :etlp-mapper.migration/updated-mapping-trigger
-                #ig/ref :etlp-mapper.migration/audit-log-mappings-fn
-                #ig/ref :etlp-mapper.migration/audit-log-mappings-trigger]}
+                 #ig/ref :etlp-mapper.migration/create-organization-subscriptions
+                 #ig/ref :etlp-mapper.migration/create-audit-logs
+                 #ig/ref :etlp-mapper.migration/create-ai-usage-logs
+                 #ig/ref :etlp-mapper.migration/create-mappings
+                 #ig/ref :etlp-mapper.migration/create-mappings-history
+                 #ig/ref :etlp-mapper.migration/insert-mapping-history
+                 #ig/ref :etlp-mapper.migration/insert_mapping_history_trigger
+                 #ig/ref :etlp-mapper.migration/updated-at-trigger
+                 #ig/ref :etlp-mapper.migration/updated-mapping-trigger
+                 #ig/ref :etlp-mapper.migration/audit-log-mappings-fn
+                 #ig/ref :etlp-mapper.migration/audit-log-mappings-trigger
+                 #ig/ref :etlp-mapper.migration/create-organization-invites]}
 
   ; Core tables
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/create-organizations]
@@ -129,7 +129,7 @@ $$ LANGUAGE plpgsql;"]
   {:up ["CREATE TRIGGER insert_mapping_history_trigger BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE FUNCTION insert_mapping_history();"]
    :down ["DROP TRIGGER insert_mapping_history_trigger ON mappings;"]}
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/updated-at-trigger]
-  {:up ["CREATE OR REPLACE FUNCTION update_changetimestamp_column() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ LANGUAGE plpgsql;"]
+  {:up ["CREATE OR REPLACE FUNCTION update_changetimestamp_column() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ language 'plpgsql';"]
    :down  ["DROP FUNCTION update_changetimestamp_column;"]}
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/updated-mapping-trigger]
   {:up ["CREATE TRIGGER update_mapping_changetimestamp BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE PROCEDURE update_changetimestamp_column();"]
@@ -146,11 +146,12 @@ $$ LANGUAGE plpgsql;"]
 
 
 ;Query handlers for Rest Endpoints
-    [:duct.handler.sql/query :etlp-mapper.handler.mappings/list]
-    {:request {{org-id :org/id} :identity}
-     :sql ["SELECT * FROM mappings WHERE organization_id = ?::uuid" org-id]
-     :hrefs {:href "/mappings/{id}"}
-     :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
+   
+  [:duct.handler.sql/query :etlp-mapper.handler.mappings/list]
+  {:request {{org-id :org/id} :identity}
+   :sql ["SELECT * FROM mappings WHERE organization_id = ?::uuid" org-id]
+   :hrefs {:href "/mappings/{id}"}
+   :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
   :etlp-mapper.auth-component/require-owner {}
   :etlp-mapper.auth-component/require-admin {}
@@ -165,7 +166,7 @@ $$ LANGUAGE plpgsql;"]
   :etlp-mapper.handler/whoami
   {}
 
-  :etlp-mapper.handler.mappings
+  :etlp-mapper.handler.mappings/test
   {:db #ig/ref :duct.database/sql
    :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
@@ -187,16 +188,15 @@ $$ LANGUAGE plpgsql;"]
 
   :etlp-mapper.handler.billing/portal {:middleware [#ig/ref :etlp-mapper.auth-component/require-admin-or-owner]}
 
-  :etlp-mapper.auth-component/require-role-admin {:role :admin}
+  :etlp-mapper.auth-component/require-role {:role :admin}
 
-    [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create-sql]
-    {:request {[_ title content] :ataraxy/result
-               {org-id :org/id} :identity}
-
-    :sql     ["INSERT INTO mappings (title, content, organization_id) VALUES (?, ?, CAST(? AS UUID))" title content org-id]
-    :location "mappings/{id}"
-     :hrefs {:href "/mappings/{id}"}
-     :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
+  [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create-sql]
+  {:request {[_ title content] :ataraxy/result
+              {org-id :org/id} :identity}
+      :sql     ["INSERT INTO mappings (title, content, organization_id) VALUES (?, ?, CAST(? AS UUID))" title content org-id]
+      :location "mappings/{id}"
+      :hrefs {:href "/mappings/{id}"}
+      :middleware [#ig/ref :etlp-mapper.auth-component/require-editor]}
 
   :etlp-mapper.handler.mappings/create
   {:db #ig/ref :duct.database/sql
