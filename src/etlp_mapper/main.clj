@@ -3,7 +3,8 @@
   (:require [duct.core :as duct]
             [etlp-mapper.pgtypes]
             [etlp-mapper.auth-component]
-            [etlp-mapper.middlewares]))
+            [etlp-mapper.middlewares]
+            [etlp-mapper.keycloak]))
 
 (duct/load-hierarchy)
 
