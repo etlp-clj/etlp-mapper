@@ -7,6 +7,23 @@ This service can be used as a standalone Jute based data transformation utility,
 ## Setup
 
 
+### API Documentation & Collections
+
+Generated assets for exploring the HTTP surface live under `docs/api/`:
+
+- `openapi.yaml` provides a complete OpenAPI 3 contract for onboarding, invitation,
+  billing, and mapping operations. Import it into Swagger UI/ReDoc or generate typed
+  clients as needed.
+- `etlp-mapper.postman_collection.json` mirrors the flow in Postman, complete with
+  variables for `baseUrl`, bearer token, organization ID, and history transaction IDs so
+  you can walk through sign-up → invite → mapping lifecycle calls.
+
+Download either artifact from the repo (or mount the repo inside Postman/Insomnia) and
+point `baseUrl` at your running instance—`http://localhost:3000` for the default dev
+profile. The collection headers already expose the optional `X-Org-Id` helper for
+switching context mid-session.
+
+
 ### Production Build
 
 As a precursor you would need Leiningen, Clojure and Java installed on our machine, once we have the basic runtime up an running, we need to clone this repo and build an uberjar.
