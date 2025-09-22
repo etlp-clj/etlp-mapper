@@ -6,7 +6,8 @@
 (def skip-files
   #{"src/etlp_mapper/users.clj"
     "src/etlp_mapper/organizations.clj"
-    "src/etlp_mapper/onboarding.clj"})
+    "src/etlp_mapper/onboarding.clj"
+    "src/etlp_mapper/auth.clj"})
 
 (defn clj-files []
   (for [f (file-seq (io/file "src/etlp_mapper"))

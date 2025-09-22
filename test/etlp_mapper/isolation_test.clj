@@ -5,10 +5,13 @@
             [integrant.core :as ig]
             [etlp-mapper.ai-usage-logs :as ai-usage-logs]
             [etlp-mapper.audit-logs :as audit-logs]
+            [etlp-mapper.handler.invites]
             [etlp-mapper.organization-invites :as org-invites]
             [etlp-mapper.organization-members :as org-members]
             [etlp-mapper.organization-subscriptions :as org-subs]
-            [etlp-mapper.handler.invites]))
+            [etlp-mapper.test-support :refer [with-test-datasource]]))
+
+(use-fixtures :once with-test-datasource)
 
 (deftest invite-dao-queries-are-scoped
   (testing "find-invite filters by organization"
@@ -20,9 +23,12 @@
         (is (= ["tok-1" "org-1"] params)))))
   (testing "consume-invite filters by organization"
     (let [captured (atom nil)]
-      (with-redefs [jdbc/delete! (fn [_ _ where] (reset! captured where) 1)]
+      (with-redefs [jdbc/update! (fn [_ _ set-map where]
+                                   (reset! captured [set-map where])
+                                   [])]
         (@#'org-invites/consume-invite* ::spec "org-1" "tok-1"))
-      (let [[where & params] @captured]
+      (let [[set-map [where & params]] @captured]
+        (is (= {:status "accepted"} set-map))
         (is (re-find #"organization_id" where))
         (is (= ["tok-1" "org-1"] params)))))
   (testing "upsert updates scoped records only"
@@ -141,73 +147,85 @@
 (deftest invite-handlers-require-organization-context
   (let [create-handler (ig/init-key :etlp-mapper.handler.invites/create {:db {:spec ::db}})
         accept-handler (ig/init-key :etlp-mapper.handler.invites/accept {:db {:spec ::db}})]
-    (testing "create invite rejects missing organization"
-      (is (= [::response/forbidden {:error "Organization context required"}]
-             (create-handler {:ataraxy/result [::create "org-1"]
-                              :identity {:org/id nil
-                                         :roles #{:admin}
-                                         :user {:id "user-1"}}}))))
-    (testing "create invite rejects organization mismatches"
-      (is (= [::response/forbidden {:error "Organization mismatch"}]
-             (create-handler {:ataraxy/result [::create "org-2"]
-                              :identity {:org/id "org-1"
-                                         :roles #{:admin}
-                                         :user {:id "user-1"}}}))))
-    (testing "create invite rejects missing user context"
-      (is (= [::response/forbidden {:error "User context required"}]
-             (create-handler {:ataraxy/result [::create "org-1"]
-                              :identity {:org/id "org-1"
-                                         :roles #{:admin}}}))))
-    (testing "create invite rejects callers without admin role"
-      (is (= [::response/forbidden {:error "Insufficient role"}]
-             (create-handler {:ataraxy/result [::create "org-1"]
-                              :identity {:org/id "org-1"
-                                         :roles #{:member}
-                                         :user {:id "user-1"}}}))))
-    (testing "create invite logs scoped token issuance"
-      (let [logged (atom nil)
-            [status body] (with-redefs [audit-logs/log! (fn [_ entry] (reset! logged entry))]
-                             (create-handler {:ataraxy/result [::create "org-1"]
-                                              :identity {:org/id "org-1"
-                                                         :roles #{:admin}
-                                                         :user {:id "user-1"}}}))]
-        (is (= ::response/ok status))
-        (is (= "org-1" (:org_id body)))
-        (is (string? (:token body)))
-        (is (= {:org-id "org-1"
-                :user-id "user-1"
-                :action "create-invite"
-                :context {:token (:token body)}}
-               @logged))))
-    (testing "accept invite rejects missing organization context"
-      (is (= [::response/forbidden {:error "Organization context required"}]
-             (accept-handler {:body-params {:token "tok-1"}
-                              :identity {:org/id nil
-                                         :user {:id "user-1"}}}))))
-    (testing "accept invite rejects mismatched body organization"
-      (is (= [::response/forbidden {:error "Organization mismatch"}]
-             (accept-handler {:body-params {:token "tok-1" :org_id "org-2"}
-                              :identity {:org/id "org-1"
-                                         :user {:id "user-1"}}}))))
-    (testing "accept invite requires a token"
-      (is (= [::response/bad-request {:error "Invalid token"}]
-             (accept-handler {:body-params {:org_id "org-1"}
-                              :identity {:org/id "org-1"
-                                         :user {:id "user-1"}}}))))
-    (testing "accept invite rejects missing user context"
-      (is (= [::response/forbidden {:error "User context required"}]
-             (accept-handler {:body-params {:token "tok-1" :org_id "org-1"}
-                              :identity {:org/id "org-1"}}))))
-    (testing "accept invite logs within the active organization"
-      (let [logged (atom nil)
-            [status body] (with-redefs [audit-logs/log! (fn [_ entry] (reset! logged entry))]
-                             (accept-handler {:body-params {:token "tok-1" :org_id "org-1"}
-                                              :identity {:org/id "org-1"
-                                                         :user {:id "user-1"}}}))]
-        (is (= ::response/ok status))
-        (is (= {:org_id "org-1" :token "tok-1" :status "accepted"} body))
-        (is (= {:org-id "org-1"
-                :user-id "user-1"
-                :action "accept-invite"
-                :context {:token "tok-1"}}
-               @logged))))))
+    (with-redefs [org-invites/upsert-invite (fn [& _] nil)
+                  org-invites/verify-token (fn [_ token]
+                                             (when (= token "tok-1")
+                                               {:role "mapper"}))
+                  org-invites/find-invite (fn [& _] {:organization_id "org-1" :email "user@example.com"})
+                  org-invites/consume-invite (fn [& _] nil)
+                  org-members/member? (fn [& _] false)
+                  org-members/add-member (fn [& _] nil)
+                  audit-logs/log! (fn [& _] nil)
+                  ai-usage-logs/log! (fn [& _] nil)]
+      (testing "create invite rejects missing organization"
+        (is (= [::response/forbidden {:error "Organization context required"}]
+               (create-handler {:ataraxy/result [::create "org-1"]
+                                :identity {:org/id nil
+                                           :roles #{:admin}
+                                           :user {:id "user-1"}}}))))
+      (testing "create invite rejects organization mismatches"
+        (is (= [::response/forbidden {:error "Organization mismatch"}]
+               (create-handler {:ataraxy/result [::create "org-2"]
+                                :identity {:org/id "org-1"
+                                           :roles #{:admin}
+                                           :user {:id "user-1"}}}))))
+      (testing "create invite rejects missing user context"
+        (is (= [::response/forbidden {:error "User context required"}]
+               (create-handler {:ataraxy/result [::create "org-1"]
+                                :identity {:org/id "org-1"
+                                           :roles #{:admin}}}))))
+      (testing "create invite rejects callers without admin role"
+        (is (= [::response/forbidden {:error "Insufficient role"}]
+               (create-handler {:ataraxy/result [::create "org-1"]
+                                :identity {:org/id "org-1"
+                                           :roles #{:member}
+                                           :user {:id "user-1"}}}))))
+      (testing "create invite logs scoped token issuance"
+        (let [logged (atom nil)
+              [status body] (with-redefs [audit-logs/log! (fn [_ entry] (reset! logged entry))]
+                               (create-handler {:ataraxy/result [::create "org-1"]
+                                                :body-params {:email "example@example.com"}
+                                                :identity {:org/id "org-1"
+                                                           :roles #{:admin}
+                                                           :user {:id "user-1"}}}))]
+          (is (= ::response/ok status))
+          (is (string? (:token body)))
+          (is (= {:org-id "org-1"
+                  :user-id "user-1"
+                  :action "create-invite"
+                  :context {:token (:token body)
+                            :email "example@example.com"
+                            :status "pending"}}
+                 @logged))))
+      (testing "accept invite rejects missing organization context"
+        (is (= [::response/forbidden {:error "Organization context required"}]
+               (accept-handler {:body-params {:token "tok-1"}
+                                :identity {:org/id nil
+                                           :user {:id "user-1"}}}))))
+      (testing "accept invite rejects mismatched body organization"
+        (is (= [::response/forbidden {:error "Organization mismatch"}]
+               (accept-handler {:body-params {:token "tok-1" :org_id "org-2"}
+                                :identity {:org/id "org-1"
+                                           :user {:id "user-1"}}}))))
+      (testing "accept invite requires a token"
+        (is (= [::response/bad-request {:error "Invalid token"}]
+               (accept-handler {:body-params {:org_id "org-1"}
+                                :identity {:org/id "org-1"
+                                           :user {:id "user-1"}}}))))
+      (testing "accept invite rejects missing user context"
+        (is (= [::response/forbidden {:error "User context required"}]
+               (accept-handler {:body-params {:token "tok-1" :org_id "org-1"}
+                                :identity {:org/id "org-1"}}))))
+      (testing "accept invite logs within the active organization"
+        (let [logged (atom nil)
+              [status body] (with-redefs [audit-logs/log! (fn [_ entry] (reset! logged entry))]
+                               (accept-handler {:body-params {:token "tok-1" :org_id "org-1"}
+                                                :identity {:org/id "org-1"
+                                                           :user {:id "user-1"}}}))]
+          (is (= ::response/ok status))
+          (is (= {:org_id "org-1" :token "tok-1" :status "accepted"} body))
+          (is (= {:org-id "org-1"
+                  :user-id "user-1"
+                  :action "accept-invite"
+                  :context {:token "tok-1"}}
+                 @logged)))))))

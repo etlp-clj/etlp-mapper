@@ -129,7 +129,7 @@ $$ LANGUAGE plpgsql;"]
   {:up ["CREATE TRIGGER insert_mapping_history_trigger BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE FUNCTION insert_mapping_history();"]
    :down ["DROP TRIGGER insert_mapping_history_trigger ON mappings;"]}
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/updated-at-trigger]
-  {:up ["CREATE OR REPLACE FUNCTION update_changetimestamp_column() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ language 'plpgsql';"]
+  {:up ["CREATE OR REPLACE FUNCTION update_changetimestamp_column() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$ LANGUAGE plpgsql;"]
    :down  ["DROP FUNCTION update_changetimestamp_column;"]}
   [:duct.migrator.ragtime/sql :etlp-mapper.migration/updated-mapping-trigger]
   {:up ["CREATE TRIGGER update_mapping_changetimestamp BEFORE UPDATE ON mappings FOR EACH ROW EXECUTE PROCEDURE update_changetimestamp_column();"]

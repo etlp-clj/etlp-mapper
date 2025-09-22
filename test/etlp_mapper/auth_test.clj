@@ -2,10 +2,13 @@
   (:require [clojure.test :refer :all]
             [clojure.java.jdbc :as jdbc]
             [etlp-mapper.auth :as auth]
-            [ring.util.http-response :as http])
+            [ring.util.http-response :as http]
+            [etlp-mapper.test-support :refer [with-test-datasource]])
   (:import (java.security KeyPairGenerator)
            (com.auth0.jwt JWT)
            (com.auth0.jwt.algorithms Algorithm)))
+
+(use-fixtures :once with-test-datasource)
 
 (def issuer "http://issuer")
 (def audience "audience")

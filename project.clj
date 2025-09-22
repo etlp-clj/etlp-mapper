@@ -39,10 +39,11 @@
    :profiles/prod {}
    :project/prod  {:source-paths   ["prod/src"]
                    :resource-paths ["prod/resources"]}
-   :profiles/dev  {} 
+   :profiles/dev  {}
    :project/dev   {:source-paths   ["dev/src"]
                    :resource-paths ["dev/resources"]
                    :dependencies   [[integrant/repl "0.3.2" :exclusions [integrant]]
                                     [hawk "0.2.11"]
                                     [eftest "0.5.9"]
-                                    [kerodon "0.9.1"]]}})
+                                    [kerodon "0.9.1"]]}
+   :test          {:dependencies [[com.h2database/h2 "2.2.224"]]}})

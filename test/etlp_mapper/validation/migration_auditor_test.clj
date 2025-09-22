@@ -31,4 +31,4 @@
 (deftest function-migrations-include-language
   (doseq [[_ {:keys [up]}] (migration-entries)]
     (when (some #(re-find #"CREATE OR REPLACE FUNCTION" %) up)
-      (is (some #(re-find #"LANGUAGE plpgsql" (str/upper-case %)) up)))))
+      (is (some #(re-find #"LANGUAGE\s+PLPGSQL" (str/upper-case %)) up)))))
