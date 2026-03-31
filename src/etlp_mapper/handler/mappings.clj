@@ -36,7 +36,10 @@
   (let [org-id      (get-in request [:identity :org/id])
         yaml-content (slurp (:body request))
         parsed-data  (yaml/parse-string yaml-content :keywords true)
-        template     (-> parsed-data :template)
+        template     (let [t (-> parsed-data :template)]
+                       (if (string? t)
+                         (yaml/parse-string t :keywords true)
+                         t))
         scope        (-> parsed-data :scope)
         compiled     (jt/compile template)]
     (assoc {:request (compiled scope)} :org/id org-id)))
