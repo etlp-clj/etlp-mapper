@@ -1,13 +1,13 @@
 {:duct.server.http/jetty
- {:port    3000}
+ {:port    3031}
 
  :duct.database/sql
  {:connection-uri #duct/env ["JDBC_URL" :or "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres"]}
 
  :etlp-mapper.auth-component/auth
- {:issuer   #duct/env ["OIDC_ISSUER" :or "http://localhost:8080/realms/mapify"]
+ {:issuer   #duct/env ["OIDC_ISSUER" :or "http://192.168.1.21:8080/realms/mapify"]
   :audience #duct/env ["OIDC_AUDIENCE" :or "mapify-api"]
-  :jwks-uri #duct/env ["OIDC_JWKS_URI" :or "http://localhost:8080/realms/mapify/protocol/openid-connect/certs"]}
+  :jwks-uri #duct/env ["OIDC_JWKS_URI" :or "http://192.168.1.21:8080/realms/mapify/protocol/openid-connect/certs"]}
 
  :etlp-mapper.auth-component/require-org {}
 
