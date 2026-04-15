@@ -1,0 +1,605 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ETLP Mapper Service",
+    "description": "Mapping service for creating and applying Jute-based data transformation templates. Supports HL7v2 parsing, mapping CRUD with version history, and template testing.",
+    "version": "0.1.0"
+  },
+  "servers": [
+    {"url": "http://localhost:3000", "description": "Local development"}
+  ],
+  "security": [{"bearerAuth": []}],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Health check",
+        "operationId": "getIndex",
+        "responses": {
+          "200": {
+            "description": "Service is running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {"type": "string", "example": "I'm Clojure"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/whoami": {
+      "get": {
+        "summary": "Get authenticated user info",
+        "operationId": "getWhoami",
+        "responses": {
+          "200": {
+            "description": "Current user identity",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/WhoamiResponse"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/mappings": {
+      "get": {
+        "summary": "List all mappings for the authenticated org",
+        "operationId": "listMappings",
+        "responses": {
+          "200": {
+            "description": "Array of mappings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/Mapping"}
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"}
+        }
+      },
+      "post": {
+        "summary": "Create a new mapping",
+        "operationId": "createMapping",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CreateMappingRequest"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Mapping created",
+            "headers": {
+              "Location": {
+                "description": "URI of the created mapping",
+                "schema": {"type": "string", "example": "mappings/123"}
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/CreateMappingResponse"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"}
+        }
+      }
+    },
+    "/mappings/{id}": {
+      "parameters": [{"$ref": "#/components/parameters/MappingId"}],
+      "get": {
+        "summary": "Get a mapping by ID",
+        "operationId": "getMapping",
+        "responses": {
+          "200": {
+            "description": "Mapping found",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Mapping"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"description": "Mapping not found"}
+        }
+      },
+      "put": {
+        "summary": "Update a mapping's content",
+        "operationId": "updateMapping",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/UpdateMappingRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {"description": "Mapping updated"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"description": "Mapping not found"}
+        }
+      },
+      "delete": {
+        "summary": "Delete a mapping",
+        "operationId": "deleteMapping",
+        "responses": {
+          "200": {"description": "Mapping deleted"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"description": "Mapping not found"}
+        }
+      }
+    },
+    "/mappings/{id}/_history": {
+      "parameters": [{"$ref": "#/components/parameters/MappingId"}],
+      "get": {
+        "summary": "Get version history for a mapping",
+        "operationId": "getMappingHistory",
+        "responses": {
+          "200": {
+            "description": "Array of historical versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/MappingHistoryEntry"}
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"description": "Mapping not found"}
+        }
+      }
+    },
+    "/mappings/{id}/_history/{version}": {
+      "parameters": [
+        {"$ref": "#/components/parameters/MappingId"},
+        {"$ref": "#/components/parameters/VersionId"}
+      ],
+      "get": {
+        "summary": "Get a specific historical version of a mapping",
+        "operationId": "getMappingHistoryVersion",
+        "responses": {
+          "200": {
+            "description": "Historical version",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/MappingHistoryEntry"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"description": "Version not found"}
+        }
+      }
+    },
+    "/mappings/{id}/apply": {
+      "parameters": [{"$ref": "#/components/parameters/MappingId"}],
+      "post": {
+        "summary": "Apply a mapping template to input data",
+        "operationId": "applyMapping",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/ApplyMappingRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transformation result",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ApplyMappingResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Transformation error",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"description": "Mapping not found"}
+        }
+      }
+    },
+    "/mappings/test": {
+      "post": {
+        "summary": "Test a mapping template without persisting",
+        "operationId": "testMapping",
+        "requestBody": {
+          "required": true,
+          "description": "Raw YAML body containing template and scope",
+          "content": {
+            "application/x-yaml": {
+              "schema": {"type": "string"},
+              "example": "template: |\n  name: {{ first_name }}\nscope:\n  first_name: John\n"
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Compiled template output",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/TestMappingResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Template compilation error",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/parse-hl7": {
+      "post": {
+        "summary": "Parse an HL7v2 message",
+        "operationId": "parseHL7",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/ParseHL7Request"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Parse result (check 'valid' field for success/failure)",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ParseHL7Response"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "OpenAPI schema",
+        "operationId": "getOpenApiSchema",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "This OpenAPI specification",
+            "content": {
+              "application/json": {
+                "schema": {"type": "object"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jute-dsl-spec.json": {
+      "get": {
+        "summary": "Jute DSL specification for LLM copilot consumption",
+        "operationId": "getJuteDslSpec",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Comprehensive Jute DSL reference including directives, functions, operators, expression syntax, and examples",
+            "content": {
+              "application/json": {
+                "schema": {"type": "object"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "OIDC JWT token from Keycloak. Must contain org_id claim."
+      }
+    },
+    "parameters": {
+      "MappingId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {"type": "integer"},
+        "description": "Mapping ID"
+      },
+      "VersionId": {
+        "name": "version",
+        "in": "path",
+        "required": true,
+        "schema": {"type": "string"},
+        "description": "Transaction ID (txnid) from history"
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid JWT token",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string", "example": "Unauthorized"}
+              }
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Missing org_id in token claims",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {"type": "string", "example": "Forbidden: organization context required"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "WhoamiResponse": {
+        "type": "object",
+        "properties": {
+          "org_id": {"type": "string", "description": "Organization ID from token"},
+          "sub": {"type": "string", "description": "Subject / user ID"},
+          "email": {"type": "string", "format": "email"},
+          "exp": {"type": "integer", "description": "Token expiration (unix timestamp)"},
+          "roles": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "User roles"
+          }
+        }
+      },
+      "MappingContent": {
+        "type": "object",
+        "description": "JSONB mapping definition, typically contains a 'yaml' key with the Jute template",
+        "properties": {
+          "yaml": {"type": "string", "description": "YAML-encoded Jute template"}
+        },
+        "additionalProperties": true
+      },
+      "Mapping": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "title": {"type": "string"},
+          "content": {"$ref": "#/components/schemas/MappingContent"},
+          "org_id": {"type": "string"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "href": {"type": "string", "example": "/mappings/123"}
+        }
+      },
+      "MappingHistoryEntry": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string"},
+          "content": {"$ref": "#/components/schemas/MappingContent"},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "txnid": {"type": "string", "description": "PostgreSQL transaction ID"},
+          "href": {"type": "string", "example": "/mappings/123/_history/456"}
+        }
+      },
+      "CreateMappingRequest": {
+        "type": "object",
+        "required": ["title", "content"],
+        "properties": {
+          "title": {"type": "string", "description": "Human-readable mapping name"},
+          "content": {"$ref": "#/components/schemas/MappingContent"}
+        }
+      },
+      "CreateMappingResponse": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "href": {"type": "string", "example": "/mappings/123"}
+        }
+      },
+      "UpdateMappingRequest": {
+        "type": "object",
+        "required": ["content"],
+        "properties": {
+          "content": {"$ref": "#/components/schemas/MappingContent"}
+        }
+      },
+      "ApplyMappingRequest": {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "Input data to transform using the mapping template",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ApplyMappingResponse": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "description": "Transformed output from the Jute template"
+          },
+          "org/id": {"type": "string"}
+        }
+      },
+      "TestMappingResponse": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "description": "Compiled template output"
+          },
+          "org/id": {"type": "string"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {"type": "string"}
+        }
+      },
+      "ParseHL7Request": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {"type": "string", "description": "Raw HL7v2 message text. Literal \\r and \\n are normalized to actual delimiters."},
+          "extensions": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Optional list of extension segment names to parse"
+          },
+          "strict": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, returns 400 if the message does not fully conform to the HL7v2 spec for its message type. Use this in CI pipelines or pre-submission checks to enforce spec compliance before EHR integration. When false (default), parses best-effort and reports conformance issues in the 'conformance' field."
+          }
+        }
+      },
+      "ConformanceWarning": {
+        "type": "object",
+        "description": "A spec-level validation issue found in the HL7 message. Upstream services should treat these as actionable — messages with warnings may be rejected by EHR systems.",
+        "required": ["type", "message"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["MISSING_REQUIRED_SEGMENT", "UNEXPECTED_SEGMENTS", "STRUCTURE_ERROR", "FIELD_VALIDATION_ERROR", "PARSE_ERROR", "VALIDATION_ERROR"],
+            "description": "Category of the conformance issue"
+          },
+          "segment": {
+            "type": "string",
+            "description": "The segment name involved (e.g. PV1), if applicable"
+          },
+          "rule": {
+            "type": "string",
+            "description": "The grammar rule that was violated (e.g. msg, insurance)"
+          },
+          "segments": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "List of unexpected segment names, if applicable"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable description of the issue"
+          }
+        }
+      },
+      "Conformance": {
+        "type": "object",
+        "description": "HL7v2 spec conformance report. When valid=false, warnings describe exactly what needs to be fixed for EHR compatibility.",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "true if the message fully conforms to the HL7v2 spec for its message type"
+          },
+          "message_structure": {
+            "type": "string",
+            "nullable": true,
+            "description": "The HL7v2 message structure identifier (e.g. ADT_A01)",
+            "example": "ADT_A01"
+          },
+          "expected_segments": {
+            "type": "array",
+            "nullable": true,
+            "items": {"type": "string"},
+            "description": "The grammar-defined segment sequence for this message type. Suffixes: ? = optional, * = zero or more, + = one or more, no suffix = required.",
+            "example": ["MSH", "SFT*", "EVN", "PID", "PD1?", "PV1", "PV2?"]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/ConformanceWarning"},
+            "description": "List of spec violations. Empty when valid=true."
+          }
+        }
+      },
+      "ParseHL7Response": {
+        "type": "object",
+        "description": "Parse result. 'valid' indicates whether parsing succeeded. 'conformance' reports spec-level issues even when parsing succeeds — upstream services should check conformance.valid to ensure EHR compatibility.",
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "Whether the message was successfully parsed (may still have conformance warnings)"
+          },
+          "parsed": {
+            "type": "object",
+            "nullable": true,
+            "description": "Parsed HL7 segments (MSH, PID, OBR, etc.)",
+            "additionalProperties": true
+          },
+          "z_segments": {
+            "type": "object",
+            "description": "Custom Z-segments not handled by extensions",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          },
+          "message_type": {
+            "type": "string",
+            "nullable": true,
+            "description": "Message type e.g. ADT^A01",
+            "example": "ADT^A01"
+          },
+          "message_control_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "MSH message control ID"
+          },
+          "segments_found": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Segment names actually present in the raw message",
+            "example": ["MSH", "EVN", "PID", "PV1", "IN1", "AL1"]
+          },
+          "conformance": {
+            "$ref": "#/components/schemas/Conformance"
+          },
+          "errors": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/ConformanceWarning"},
+            "description": "Parse-level errors (empty when valid=true)"
+          }
+        }
+      }
+    }
+  }
+}

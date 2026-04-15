@@ -1,0 +1,767 @@
+{
+  "jute_dsl_spec": {
+    "version": "1.0.0",
+    "description": "Jute is a JSON/YAML-based template language for data transformation. Templates are JSON/YAML documents where string values starting with '$ ' are evaluated as expressions against an input scope (data context). Objects with special directive keys ($if, $map, etc.) control flow and iteration. The result is a new JSON document with all expressions resolved.",
+
+    "expression_syntax": {
+      "overview": "Expressions are string values prefixed with '$ ' (dollar sign + space). They are evaluated against the current scope — the input data plus any variables introduced by directives like $let or $map.",
+      "path_navigation": {
+        "syntax": "$ object.key.nestedKey",
+        "description": "Dot-separated path to traverse nested objects. Returns the value at that path, or null if any segment is missing.",
+        "examples": [
+          {"input": {"store": {"book": {"author": "Tolkien"}}}, "template": "$ store.book.author", "result": "Tolkien"},
+          {"input": {"foo": 12}, "template": "$ foo", "result": 12}
+        ]
+      },
+      "array_indexing": {
+        "syntax": "$ array.0, $ array.-1",
+        "description": "Access array elements by zero-based index. Negative indices count from the end (-1 = last element).",
+        "examples": [
+          {"input": {"book": [{"title": "A"}, {"title": "B"}]}, "template": "$ book.0.title", "result": "A"},
+          {"input": {"book": [{"title": "A"}, {"title": "B"}]}, "template": "$ book.-1.title", "result": "B"}
+        ]
+      },
+      "wildcards": {
+        "syntax": "$ collection.*.field",
+        "description": "Single wildcard '*' expands over all elements of an array or all values of an object at that level, returning an array of results.",
+        "examples": [
+          {
+            "input": {"store": {"book": [{"author": "Rees"}, {"author": "Waugh"}, {"author": "Melville"}, {"author": "Tolkien"}]}},
+            "template": "$ store.book.*.author",
+            "result": ["Rees", "Waugh", "Melville", "Tolkien"]
+          },
+          {
+            "input": {"a": 3, "b": 5, "c": [true, false]},
+            "template": "$ @.*",
+            "result": [3, 5, [true, false]]
+          }
+        ]
+      },
+      "deep_wildcards": {
+        "syntax": "$ root.**.field",
+        "description": "Double wildcard '**' recursively traverses all nested structures, collecting all values for the specified field at any depth.",
+        "examples": [
+          {
+            "description": "Collect all prices from any depth",
+            "input": {"store": {"book": [{"price": 8.95}, {"price": 12.99}], "bicycle": {"price": 19.95}}},
+            "template": "$ store.**.price",
+            "result": [8.95, 12.99, 19.95]
+          }
+        ]
+      },
+      "predicates": {
+        "syntax": "$ collection.*(condition)",
+        "description": "Filter elements where the condition is true. Inside the predicate, 'this' refers to the current element being tested. Variables from the outer scope are also accessible.",
+        "examples": [
+          {
+            "description": "Filter books cheaper than 10",
+            "input": {"store": {"book": [{"title": "Sayings", "price": 8.95}, {"title": "Sword", "price": 12.99}, {"title": "Moby Dick", "price": 8.99}]}},
+            "template": "$ store.book.*(this.price < 10).title",
+            "result": ["Sayings", "Moby Dick"]
+          },
+          {
+            "description": "Filter using outer scope variable",
+            "input": {"someVar": "fiction", "store": {"book": [{"title": "Sayings", "category": "reference"}, {"title": "Sword", "category": "fiction"}]}},
+            "template": "$ store.book.*(this.category = someVar).title",
+            "result": ["Sword"]
+          }
+        ]
+      },
+      "dynamic_paths": {
+        "syntax": "$ object.(expression)",
+        "description": "Use a parenthesized expression as a dynamic path component. The expression is evaluated and its result is used as the key/index.",
+        "examples": [
+          {
+            "input": {"otherVar": 3, "store": {"book": [{"title": "A"}, {"title": "B"}, {"title": "C"}, {"title": "D"}]}},
+            "template": "$ store.book.(otherVar).title",
+            "result": "D"
+          }
+        ]
+      },
+      "root_reference": {
+        "syntax": "$ @",
+        "description": "The '@' symbol refers to the root of the current scope. Useful when you need to reference the entire input or when inside a directive that has shadowed outer variables.",
+        "examples": [
+          {
+            "input": {"a": 3, "b": 5, "c": [true, false]},
+            "template": "$ @.*",
+            "result": [3, 5, [true, false]]
+          }
+        ]
+      },
+      "pipe_operator": {
+        "syntax": "$ value |> fn1(arg) |> fn2(arg)",
+        "description": "Pipeline operator passes the left-hand value as the first argument to the right-hand function. Enables readable left-to-right data transformation chains.",
+        "examples": [
+          {
+            "input": {"s": "foo bar bar baz"},
+            "template": "$ s |> splitStr(\" +\") |> uniq",
+            "result": ["foo", "bar", "baz"]
+          }
+        ]
+      },
+      "function_call_in_path": {
+        "syntax": "$ fn(args).index",
+        "description": "Function call results can be used as path heads, allowing further path navigation on the return value.",
+        "examples": [
+          {
+            "input": {"s": "my string"},
+            "template": "$ splitStr(s, \" \").0",
+            "result": "my"
+          }
+        ]
+      },
+      "string_literals": {
+        "syntax": "$ 'single quoted' or $ \"double quoted\"",
+        "description": "String literals can be expressed with single or double quotes inside expressions.",
+        "examples": [
+          {"template": "$ 'foo'", "result": "foo"},
+          {"template": "$ \"bar\"", "result": "bar"}
+        ]
+      },
+      "null_comparison": {
+        "syntax": "$ value = null",
+        "description": "Null is a first-class value. Comparing with null works as expected. Note: null is distinct from the string 'null'.",
+        "examples": [
+          {
+            "input": {"foo": null},
+            "template": {"$if": "$ foo = null", "$then": "is null", "$else": "not null"},
+            "result": "is null"
+          }
+        ]
+      },
+      "numeric_string_keys": {
+        "syntax": "$ obj.2",
+        "description": "When accessing a map with numeric string keys, the numeric path component is tried as a string key on maps. On arrays, it's used as an index.",
+        "examples": [
+          {
+            "input": {"pid1": {"1": "foo", "2": "bar"}, "pid2": ["foo", "bar"]},
+            "template": {"result1": "$ pid1.2", "result2": "$ pid2.1"},
+            "result": {"result1": "bar", "result2": "bar"}
+          }
+        ]
+      }
+    },
+
+    "operators": {
+      "precedence_order": [
+        "Unary (-, +, !)",
+        "Exponentiation (^)",
+        "Multiplication, Division, Remainder (*, /, %)",
+        "Addition, Subtraction (+, -)",
+        "Comparison (>, <, >=, <=)",
+        "Equality (=, !=)",
+        "Logical AND (&&)",
+        "Logical OR (||)"
+      ],
+      "arithmetic": [
+        {"symbol": "+", "description": "Addition (numbers) or string concatenation (strings)", "example": "$ 2 + 3"},
+        {"symbol": "-", "description": "Subtraction", "example": "$ 10 - 4"},
+        {"symbol": "*", "description": "Multiplication", "example": "$ 3 * 5"},
+        {"symbol": "/", "description": "Division", "example": "$ 10 / 3"},
+        {"symbol": "%", "description": "Remainder/modulo", "example": "$ 10 % 3"},
+        {"symbol": "^", "description": "Exponentiation (returns float)", "example": "$ 2 ^ 10"}
+      ],
+      "comparison": [
+        {"symbol": "=", "description": "Equality (strict type comparison: true != \"True\")", "example": "$ foo = 1"},
+        {"symbol": "!=", "description": "Inequality", "example": "$ foo != null"},
+        {"symbol": ">", "description": "Greater than (lexicographic for strings)", "example": "$ a > b"},
+        {"symbol": "<", "description": "Less than (lexicographic for strings)", "example": "$ price < 10"},
+        {"symbol": ">=", "description": "Greater than or equal", "example": "$ count >= 0"},
+        {"symbol": "<=", "description": "Less than or equal", "example": "$ count <= 100"}
+      ],
+      "logical": [
+        {"symbol": "&&", "description": "Logical AND (short-circuit evaluation)", "example": "$ a > 0 && b > 0"},
+        {"symbol": "||", "description": "Logical OR (short-circuit evaluation)", "example": "$ a || b"},
+        {"symbol": "!", "description": "Logical NOT (unary prefix)", "example": "$ !flag"}
+      ],
+      "notes": [
+        "Operator precedence follows standard mathematical conventions.",
+        "The + operator on strings performs concatenation: $ \"hello, \" + name",
+        "Equality is strict: $ true = \"True\" evaluates to false.",
+        "Exponentiation returns a float: $ 2 ^ 10 yields 1024.0",
+        "Arithmetic expressions follow standard precedence: $ 2 + 3 * 3 yields 11 (not 15)."
+      ]
+    },
+
+    "directives": {
+      "$if": {
+        "description": "Conditional evaluation. Evaluates a condition and returns one of two branches.",
+        "syntax": {
+          "full_form": {"$if": "<condition>", "$then": "<value_if_true>", "$else": "<value_if_false>"},
+          "short_form": {"$if": "<condition>", "key1": "val1", "key2": "val2"}
+        },
+        "parameters": {
+          "$if": "Expression that evaluates to a truthy/falsy value",
+          "$then": "Value returned when condition is true (full form)",
+          "$else": "Value returned when condition is false (full form, optional — defaults to null)"
+        },
+        "behavior": [
+          "Full form: returns $then if condition is truthy, $else otherwise (null if no $else).",
+          "Short form (no $then/$else): returns the object without the $if key when true, null when false.",
+          "Condition is strict: only false and null are falsy. 0 and empty string are truthy."
+        ],
+        "examples": [
+          {
+            "description": "Full form with $then and $else",
+            "input": {"foo": 1},
+            "template": {"$if": "$ foo = 1", "$then": "$ foo + 1", "$else": "nope"},
+            "result": 2
+          },
+          {
+            "description": "Returns null when condition is false and no $else",
+            "input": {"foo": 1},
+            "template": {"$if": "$ foo = 0", "$then": "yes"},
+            "result": null
+          },
+          {
+            "description": "Short form returns object without $if when true",
+            "input": {"foo": 1},
+            "template": {"$if": "$ foo = 1", "someKey": "some value"},
+            "result": {"someKey": "some value"}
+          },
+          {
+            "description": "Short form returns null when false",
+            "input": {"foo": 1},
+            "template": {"$if": "$ foo = 0", "someKey": "some value"},
+            "result": null
+          },
+          {
+            "description": "Boolean comparison is strict (true != \"True\")",
+            "input": {"flag": true},
+            "template": "$ flag = \"True\"",
+            "result": false
+          }
+        ]
+      },
+      "$map": {
+        "description": "Iterate over an array or object, evaluating $body for each element. Returns an array of results.",
+        "syntax": {
+          "array_form": {"$map": "<array_expression>", "$as": "<varname>", "$body": "<template>"},
+          "indexed_form": {"$map": "<array_expression>", "$as": ["<item>", "<index>"], "$body": "<template>"},
+          "object_form": {"$map": "<object_expression>", "$as": "<varname>", "$body": "<template>"}
+        },
+        "parameters": {
+          "$map": "Expression evaluating to an array or object to iterate over",
+          "$as": "Variable name (string) or [item, index] pair (array) to bind each element",
+          "$body": "Template evaluated for each element; the bound variable is added to scope"
+        },
+        "behavior": [
+          "For arrays: each element is bound to the $as variable.",
+          "For arrays with index: use $as: [item, idx] to get both element and zero-based index.",
+          "For objects: each entry is bound as {key: <key>, value: <value>}."
+        ],
+        "examples": [
+          {
+            "description": "Map over array with greeting",
+            "input": {"names": ["Bob", "John", "Nick"]},
+            "template": {"$map": "$ names", "$as": "name", "$body": "$ \"hello, \" + name"},
+            "result": ["hello, Bob", "hello, John", "hello, Nick"]
+          },
+          {
+            "description": "Map with index binding",
+            "input": {"names": ["Bob", "John", "Nick"]},
+            "template": {"$map": "$ names", "$as": ["name", "idx"], "$body": "$ \"hello, \" + name + \" - \" + idx"},
+            "result": ["hello, Bob - 0", "hello, John - 1", "hello, Nick - 2"]
+          },
+          {
+            "description": "Map over object yields key/value pairs",
+            "input": {"items": {"names": ["Bob", "John"], "families": ["Smith", "James"]}},
+            "template": {"$map": "$ items", "$as": "i", "$body": ["$ str(i.key)", "$ i.value"]},
+            "result": [["names", ["Bob", "John"]], ["families", ["Smith", "James"]]]
+          }
+        ]
+      },
+      "$reduce": {
+        "description": "Reduce/fold an array or object into a single accumulated value.",
+        "syntax": {"$reduce": "<collection>", "$as": ["<accumulator>", "<item>"], "$start": "<initial_value>", "$body": "<expression>"},
+        "parameters": {
+          "$reduce": "Expression evaluating to an array or object",
+          "$as": "Two-element array: [accumulator_name, item_name]",
+          "$start": "Initial value for the accumulator (also accepted as $from)",
+          "$body": "Expression evaluated for each element; must produce the next accumulator value"
+        },
+        "behavior": [
+          "Iterates over the collection, threading the accumulator through each step.",
+          "For objects: each item is bound as {key: <key>, value: <value>}.",
+          "$start and $from are interchangeable."
+        ],
+        "examples": [
+          {
+            "description": "Concatenate names with separator",
+            "input": {"names": ["Bob", "John", "Nick"]},
+            "template": {"$reduce": "$ names", "$as": ["acc", "name"], "$start": "", "$body": "$ acc + \"|\" + name"},
+            "result": "|Bob|John|Nick"
+          },
+          {
+            "description": "Flatten object values into single array",
+            "input": {"items": {"russia": ["omsk", "moscow"], "usa": ["orlando", "seattle"]}},
+            "template": {"$reduce": "$ items", "$as": ["acc", "pair"], "$from": [], "$body": "$ concat(acc, pair.value)"},
+            "result": ["omsk", "moscow", "orlando", "seattle"]
+          }
+        ]
+      },
+      "$let": {
+        "description": "Introduce local variables into scope, then evaluate $body with the extended scope.",
+        "syntax": {
+          "object_form": {"$let": {"var1": "<expr>", "var2": "<expr>"}, "$body": "<template>"},
+          "array_form": {"$let": [{"var": "<expr>"}, {"result": "<expr>"}], "$body": "<template>"}
+        },
+        "parameters": {
+          "$let": "Object of {name: expression} bindings, or array of single-key objects for ordered evaluation",
+          "$body": "Template evaluated with the new variables in scope"
+        },
+        "behavior": [
+          "Object form: all bindings are evaluated with access to the original scope.",
+          "Array form: bindings are evaluated in order; later bindings can reference earlier ones.",
+          "Existing scope variables remain accessible in $body alongside new bindings."
+        ],
+        "examples": [
+          {
+            "description": "Object-style variable binding",
+            "input": {"foo": 1},
+            "template": {"$let": {"firstVar": "$ foo + 1", "secondVar": {"key": "hello world!"}}, "$body": {"foo": "$ foo", "firstVar": "$ firstVar", "secondVarKey": "$ secondVar.key"}},
+            "result": {"foo": 1, "firstVar": 2, "secondVarKey": "hello world!"}
+          },
+          {
+            "description": "Array-style sequential binding with chained computation",
+            "input": {"foo": 1},
+            "template": {"$let": [{"var": "$ foo + 1"}, {"result": "$ var + 5"}, {"result": "$ result - 3"}, {"result": "$ result / 2"}], "$body": {"result": "$ result"}},
+            "result": {"result": 2}
+          }
+        ]
+      },
+      "$fn": {
+        "description": "Define a reusable function that can be called from expressions or via $call.",
+        "syntax": {"$fn": ["<param1>", "<param2>"], "$body": "<template>"},
+        "parameters": {
+          "$fn": "Array of parameter names (strings)",
+          "$body": "Template evaluated when the function is called, with parameters in scope",
+          "$name": "Optional. Assigns a name to the function for recursive self-reference."
+        },
+        "behavior": [
+          "Returns a callable function value. Typically assigned via $let, then invoked in expressions.",
+          "Captures the enclosing scope (closures).",
+          "Use $name to enable recursion — the function can call itself by that name."
+        ],
+        "examples": [
+          {
+            "description": "Define and call a simple function",
+            "input": {"foo": 1.0},
+            "template": {"$let": {"fooToBar": {"$fn": ["fooArg", "otherArg"], "$body": "$ fooArg + 3 - otherArg"}}, "$body": "$ foo + fooToBar(foo, 3.0)"},
+            "result": 2.0
+          },
+          {
+            "description": "Closure — inner function accesses outer scope",
+            "input": {"foo": 1.0},
+            "template": {"$let": {"someStuff": "world"}, "$body": {"$let": {"greetStuff": {"$fn": ["greeting"], "$body": "$ greeting + someStuff"}}, "$body": "$ greetStuff(\"hello, \")"}},
+            "result": "hello, world"
+          },
+          {
+            "description": "Recursive function (fibonacci)",
+            "input": null,
+            "template": {"$let": {"fib": {"$fn": ["n"], "$name": "fib", "$body": {"$if": "$ n <= 1", "$then": 1, "$else": "$ fib(n - 1) + fib(n - 2)"}}}, "$body": "$ fib(10)"},
+            "result": 89
+          }
+        ]
+      },
+      "$call": {
+        "description": "Invoke a function (built-in or user-defined) with an array of arguments.",
+        "syntax": {"$call": "<function_name>", "$args": ["<arg1>", "<arg2>"]},
+        "parameters": {
+          "$call": "Function name (string) — looks up in current scope first, then built-in functions",
+          "$args": "Array of arguments, or an expression evaluating to an array"
+        },
+        "behavior": [
+          "Useful when the function name or arguments must be constructed dynamically.",
+          "Arguments in $args are evaluated before the function is called."
+        ],
+        "examples": [
+          {
+            "description": "Call built-in joinStr with static args",
+            "input": {"names": ["Bob", "John", "Nick"]},
+            "template": {"$call": "joinStr", "$args": [", ", "$ names"]},
+            "result": "Bob, John, Nick"
+          },
+          {
+            "description": "Dynamic $args from scope",
+            "input": {"args": [", ", ["foo", "bar"]]},
+            "template": {"$call": "joinStr", "$args": "$ args"},
+            "result": "foo, bar"
+          }
+        ]
+      },
+      "$switch": {
+        "description": "Pattern matching — evaluate an expression and select a branch by matching its string representation against keys.",
+        "syntax": {"$switch": "<expression>", "\"value1\"": "<result1>", "\"value2\"": "<result2>", "$default": "<fallback>"},
+        "parameters": {
+          "$switch": "Expression whose result (stringified) is matched against the object keys",
+          "$default": "Optional fallback value if no key matches"
+        },
+        "behavior": [
+          "The expression result is converted to a string and matched against the keys.",
+          "Returns the value of the matching key, or $default if provided, or null."
+        ],
+        "examples": [
+          {
+            "description": "Match computed value against string keys",
+            "input": {"foo": 1},
+            "template": {"$switch": "$ foo + 1", "1": "wrong", "2": "right"},
+            "result": "right"
+          },
+          {
+            "description": "Use $default for fallback",
+            "input": {"foo": 1},
+            "template": {"$switch": "$ foo", "bar": "bar", "$default": "$ foo + 1"},
+            "result": 2
+          },
+          {
+            "description": "Returns null when no match and no $default",
+            "input": null,
+            "template": {"$switch": "$ foo", "bar": "bar"},
+            "result": null
+          }
+        ]
+      }
+    },
+
+    "builtin_functions": {
+      "string": {
+        "joinStr": {
+          "signature": "joinStr(separator, array)",
+          "description": "Join array elements into a string with the given separator.",
+          "examples": [
+            {"input": {"names": ["Bob", "John"]}, "template": "$ joinStr(\", \", names)", "result": "Bob, John"}
+          ]
+        },
+        "splitStr": {
+          "signature": "splitStr(string, regex_pattern, [limit])",
+          "description": "Split a string by a regex pattern. Optional limit controls max number of splits. Null input returns [\"\"].",
+          "examples": [
+            {"input": {"s": "foo bar baz"}, "template": "$ splitStr(s, \" +\")", "result": ["foo", "bar", "baz"]},
+            {"input": {"s": "foo bar baz"}, "template": "$ splitStr(s, \" +\", 2)", "result": ["foo", "bar baz"]}
+          ]
+        },
+        "substr": {
+          "signature": "substr(string, start, [end])",
+          "description": "Extract a substring from start index to optional end index.",
+          "examples": [
+            {"template": "$ substr(\"hello world\", 0, 5)", "result": "hello"}
+          ]
+        },
+        "replace": {
+          "signature": "replace(string, regex_pattern, replacement)",
+          "description": "Replace all occurrences matching the regex pattern. Null/empty input returns empty string.",
+          "examples": [
+            {"input": {"a": "Hello  JUTE  tool"}, "template": "$ replace(a, \"\\s+\", \" \")", "result": "Hello JUTE tool"}
+          ]
+        },
+        "toLowerCase": {
+          "signature": "toLowerCase(string)",
+          "description": "Convert string to lowercase. Null input returns empty string.",
+          "examples": [
+            {"template": "$ toLowerCase(\"HELLO\")", "result": "hello"}
+          ]
+        },
+        "toUpperCase": {
+          "signature": "toUpperCase(string)",
+          "description": "Convert string to uppercase. Null input returns empty string.",
+          "examples": [
+            {"template": "$ toUpperCase(\"test\")", "result": "TEST"}
+          ]
+        },
+        "capitalize": {
+          "signature": "capitalize(string)",
+          "description": "Capitalize first letter, lowercase the rest. Null input returns empty string.",
+          "examples": [
+            {"template": "$ capitalize(\"hello\")", "result": "Hello"},
+            {"template": "$ capitalize(\"HELLO\")", "result": "Hello"}
+          ]
+        },
+        "trim": {
+          "signature": "trim(string)",
+          "description": "Remove leading and trailing whitespace.",
+          "examples": [
+            {"input": {"a": "  hello  "}, "template": "$ trim(a)", "result": "hello"}
+          ]
+        },
+        "str": {
+          "signature": "str(value)",
+          "description": "Convert any value to its string representation. Keywords are converted to their name (without colon).",
+          "examples": [
+            {"template": "$ str(42)", "result": "42"},
+            {"template": "$ str(true)", "result": "true"}
+          ]
+        },
+        "toString": {
+          "signature": "toString(value)",
+          "description": "Alias for str. Convert any value to string.",
+          "examples": []
+        }
+      },
+      "array": {
+        "len": {
+          "signature": "len(collection)",
+          "description": "Return the count of elements in an array, characters in a string, or entries in a map.",
+          "examples": [
+            {"input": {"a": [1, 2, 3]}, "template": "$ len(a)", "result": 3}
+          ]
+        },
+        "uniq": {
+          "signature": "uniq(array)",
+          "description": "Return array with duplicate values removed, preserving order.",
+          "examples": [
+            {"input": {"a": [1, 2, 2, "foo", "foo", null]}, "template": "$ uniq(a)", "result": [1, 2, "foo", null]}
+          ]
+        },
+        "flatten": {
+          "signature": "flatten(array)",
+          "description": "Flatten nested arrays into a single-level array.",
+          "examples": [
+            {"template": "$ flatten([[1, 2], [3, [4, 5]]])", "result": [1, 2, 3, 4, 5]}
+          ]
+        },
+        "concat": {
+          "signature": "concat(array1, array2)",
+          "description": "Concatenate two arrays into one.",
+          "examples": [
+            {"template": "$ concat([1, 2], [3, 4])", "result": [1, 2, 3, 4]}
+          ]
+        },
+        "randNth": {
+          "signature": "randNth(array)",
+          "description": "Return a random element from the array.",
+          "examples": [
+            {"input": {"items": ["a"]}, "template": "$ randNth(items)", "result": "a"}
+          ]
+        },
+        "groupBy": {
+          "signature": "groupBy(array, function)",
+          "description": "Group array elements by the result of applying a function to each element.",
+          "examples": []
+        }
+      },
+      "object": {
+        "merge": {
+          "signature": "merge(map1, map2, ...)",
+          "description": "Merge multiple maps together. Later maps override earlier keys.",
+          "examples": [
+            {"template": "$ merge({\"a\": 1}, {\"b\": 2, \"a\": 3})", "result": {"a": 3, "b": 2}}
+          ]
+        },
+        "assoc": {
+          "signature": "assoc(map, key, value)",
+          "description": "Return a new map with the given key set to the given value.",
+          "examples": [
+            {"template": "$ assoc({\"a\": 1}, \"b\", 2)", "result": {"a": 1, "b": 2}}
+          ]
+        }
+      },
+      "type_conversion": {
+        "toInt": {
+          "signature": "toInt(value)",
+          "description": "Parse a string or number as an integer.",
+          "examples": [
+            {"template": "$ toInt(\"42\")", "result": 42}
+          ]
+        },
+        "toDec": {
+          "signature": "toDec(value)",
+          "description": "Parse a string or number as a decimal (float).",
+          "examples": [
+            {"template": "$ toDec(\"3.14\")", "result": 3.14}
+          ]
+        },
+        "toKeyword": {
+          "signature": "toKeyword(string)",
+          "description": "Convert a string to a keyword (Clojure keyword type).",
+          "examples": []
+        }
+      },
+      "math": {
+        "abs": {
+          "signature": "abs(number)",
+          "description": "Return the absolute value of a number.",
+          "examples": [
+            {"template": "$ abs(-5)", "result": 5}
+          ]
+        },
+        "range": {
+          "signature": "range(end) or range(start, end) or range(start, end, step)",
+          "description": "Generate a sequence of numbers. Same semantics as Clojure's range.",
+          "examples": [
+            {"template": "$ range(5)", "result": [0, 1, 2, 3, 4]},
+            {"template": "$ range(1, 4)", "result": [1, 2, 3]}
+          ]
+        }
+      },
+      "utility": {
+        "now": {
+          "signature": "now()",
+          "description": "Return the current date/time as an ISO-8601 string.",
+          "examples": [
+            {"template": "$ now()", "result": "2024-01-15T10:30:00Z (current timestamp)"}
+          ]
+        },
+        "daysInMonth": {
+          "signature": "daysInMonth(year, month)",
+          "description": "Return the number of days in the given month/year. Handles leap years correctly.",
+          "examples": [
+            {"template": "$ daysInMonth(2000, 2)", "result": 29},
+            {"template": "$ daysInMonth(1999, 2)", "result": 28}
+          ]
+        },
+        "dropBlanks": {
+          "signature": "dropBlanks(value)",
+          "description": "Recursively remove null values and empty collections from nested data structures. Removes map entries with null values, filters nulls from arrays, and drops empty sub-structures left after removal.",
+          "examples": [
+            {
+              "input": {"a": [null, null, 3]},
+              "template": "$ dropBlanks(a)",
+              "result": [3]
+            },
+            {
+              "input": {"b": {"foo": null, "bar": 12, "baz": [{"foo": null}, 42]}},
+              "template": "$ dropBlanks(b)",
+              "result": {"bar": 12, "baz": [42]}
+            }
+          ]
+        },
+        "hash": {
+          "signature": "hash(value)",
+          "description": "Compute a hash value for the input.",
+          "examples": []
+        },
+        "println": {
+          "signature": "println(value)",
+          "description": "Print a value to the console (for debugging). Returns the value.",
+          "examples": []
+        }
+      }
+    },
+
+    "compile_options": {
+      "discard-map-when-everything-evaluated-to-null": {
+        "description": "When enabled, if all dynamically-evaluated values in a map resolve to null, the entire map is discarded (returns null). Static values alone do not prevent discard. Maps containing 'false' values are preserved.",
+        "example": {
+          "input": null,
+          "options": {"discard-map-when-everything-evaluated-to-null": true},
+          "template": {"bar": 42, "foo": {"x": 12, "y": 24, "z": "$ nonexistent"}},
+          "result": null,
+          "note": "Even though bar=42 and x=12, y=24 are static, the single dynamic value z evaluated to null, so the entire root map is discarded."
+        },
+        "counter_example": {
+          "description": "false values are not treated as null",
+          "input": {"foo": {"bar": false}},
+          "options": {"discard-map-when-everything-evaluated-to-null": true},
+          "template": {"bar": 42, "foo": {"x": 12, "y": 24, "z": "$ foo.bar"}},
+          "result": {"bar": 42, "foo": {"x": 12, "y": 24, "z": false}}
+        }
+      }
+    },
+
+    "data_types": [
+      {"type": "string", "description": "Text values, quoted with single or double quotes in expressions"},
+      {"type": "number", "description": "Integers and floating-point numbers. Arithmetic follows standard precedence."},
+      {"type": "boolean", "description": "true or false. Strict comparison: true != \"True\"."},
+      {"type": "null", "description": "Null/nil value. Missing paths resolve to null."},
+      {"type": "array", "description": "Ordered collection. Supports indexing, wildcards, and iteration."},
+      {"type": "object", "description": "Key-value map. Supports dot-path navigation, wildcards, and iteration."}
+    ],
+
+    "template_structure": {
+      "overview": "A Jute template is a JSON or YAML document. Any string value starting with '$ ' (dollar-space) is treated as an expression and evaluated against the input scope. Objects with directive keys ($if, $map, $let, $reduce, $fn, $call, $switch) are control structures. All other values pass through unchanged.",
+      "rules": [
+        "Expressions must start with '$ ' (dollar sign followed by a space).",
+        "Directive keys start with '$' and are reserved: $if, $then, $else, $map, $as, $body, $reduce, $start, $from, $let, $fn, $name, $call, $args, $switch, $default.",
+        "Static values (strings not starting with '$ ', numbers, booleans, null) are returned as-is.",
+        "Arrays in templates are evaluated element-by-element.",
+        "Objects in templates are evaluated key-by-key, with expression values resolved."
+      ]
+    },
+
+    "template_examples": [
+      {
+        "description": "Simple field extraction and transformation",
+        "input": {"patient": {"firstName": "John", "lastName": "Doe", "age": 30}},
+        "template": {
+          "fullName": "$ patient.firstName + \" \" + patient.lastName",
+          "isAdult": "$ patient.age >= 18",
+          "ageGroup": {"$if": "$ patient.age >= 65", "$then": "senior", "$else": {"$if": "$ patient.age >= 18", "$then": "adult", "$else": "minor"}}
+        },
+        "result": {
+          "fullName": "John Doe",
+          "isAdult": true,
+          "ageGroup": "adult"
+        }
+      },
+      {
+        "description": "Iterating and transforming a list",
+        "input": {"items": [{"name": "Apple", "price": 1.5}, {"name": "Banana", "price": 0.75}]},
+        "template": {
+          "products": {
+            "$map": "$ items",
+            "$as": ["item", "idx"],
+            "$body": {
+              "id": "$ idx + 1",
+              "label": "$ toUpperCase(item.name)",
+              "priceFormatted": "$ \"$\" + str(item.price)"
+            }
+          }
+        },
+        "result": {
+          "products": [
+            {"id": 1, "label": "APPLE", "priceFormatted": "$1.5"},
+            {"id": 2, "label": "BANANA", "priceFormatted": "$0.75"}
+          ]
+        }
+      },
+      {
+        "description": "Using $let for intermediate computation and $reduce for aggregation",
+        "input": {"orders": [{"amount": 100}, {"amount": 250}, {"amount": 50}]},
+        "template": {
+          "$let": {
+            "total": {
+              "$reduce": "$ orders",
+              "$as": ["acc", "order"],
+              "$start": 0,
+              "$body": "$ acc + order.amount"
+            }
+          },
+          "$body": {
+            "orderCount": "$ len(orders)",
+            "totalAmount": "$ total",
+            "hasHighValue": "$ total > 300"
+          }
+        },
+        "result": {
+          "orderCount": 3,
+          "totalAmount": 400,
+          "hasHighValue": true
+        }
+      },
+      {
+        "description": "Filtering with predicates and pipelines",
+        "input": {
+          "store": {
+            "book": [
+              {"title": "Sayings of the Century", "price": 8.95, "category": "reference"},
+              {"title": "Sword of Honour", "price": 12.99, "category": "fiction"},
+              {"title": "Moby Dick", "price": 8.99, "category": "fiction"}
+            ]
+          }
+        },
+        "template": {
+          "cheapBooks": "$ store.book.*(this.price < 10).title",
+          "fictionBooks": "$ store.book.*(this.category = \"fiction\").title",
+          "allPrices": "$ store.book.*.price"
+        },
+        "result": {
+          "cheapBooks": ["Sayings of the Century", "Moby Dick"],
+          "fictionBooks": ["Sword of Honour", "Moby Dick"],
+          "allPrices": [8.95, 12.99, 8.99]
+        }
+      }
+    ]
+  }
+}

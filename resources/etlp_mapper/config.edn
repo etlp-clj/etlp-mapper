@@ -17,10 +17,16 @@
             [:post "/mappings/test"]
             [:etlp-mapper.handler/mappings]
 
+            [:post "/parse-hl7" {{:keys [message]} :body-params}]
+            [:etlp-mapper.handler/parse-hl7 message]
+
             [:get    "/mappings/" id] [:etlp-mapper.handler.mappings/find ^int id]
             [:get    "/mappings/" id "/_history"] [:etlp-mapper.handler.mappings/history ^int id]
             [:get    "/mappings/" id "/_history/" version] [:etlp-mapper.handler.mappings/traverse-history ^int id version]
-            [:delete "/mappings/" id] [:etlp-mapper.handler.mappings/destroy ^int id]}}
+            [:delete "/mappings/" id] [:etlp-mapper.handler.mappings/destroy ^int id]
+
+            [:get "/openapi.json"] [:etlp-mapper.handler/openapi]
+            [:get "/jute-dsl-spec.json"] [:etlp-mapper.handler/jute-dsl-spec]}}
 
   :duct.handler/root {:middleware [#ig/ref :etlp-mapper.auth-component/require-org
                                    #ig/ref :etlp-mapper.auth-component/auth
@@ -163,6 +169,15 @@ $$ LANGUAGE plpgsql;"]
   {:db #ig/ref :duct.database/sql}
 
   :etlp-mapper.handler/whoami
+  {}
+
+  :etlp-mapper.handler/openapi
+  {}
+
+  :etlp-mapper.handler/jute-dsl-spec
+  {}
+
+  :etlp-mapper.handler/parse-hl7
   {}
 
   :etlp-mapper.handler/mappings
