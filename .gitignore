@@ -16,3 +16,8 @@ pom.xml.asc
 .lsp
 .env
 .env-vars
+.env.copilot
+.env.local
+
+# Claude Code local state
+.claude/

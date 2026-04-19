@@ -17,6 +17,12 @@
             [:post "/mappings/test"]
             [:etlp-mapper.handler/mappings]
 
+            [:post "/mappings/generate"]
+            [:etlp-mapper.handler.copilot/generate]
+
+            [:post "/mappings/test-template"]
+            [:etlp-mapper.handler.copilot/test-template]
+
             [:post "/parse-hl7" {{:keys [message]} :body-params}]
             [:etlp-mapper.handler/parse-hl7 message]
 
@@ -30,7 +36,19 @@
 
   :duct.handler/root {:middleware [#ig/ref :etlp-mapper.auth-component/require-org
                                    #ig/ref :etlp-mapper.auth-component/auth
-                                   #ig/ref :etlp-mapper.middlewares/cors]}
+                                   #ig/ref :etlp-mapper.middlewares/cors
+                                   #ig/ref :etlp-mapper.kb-hook/middleware]}
+
+  ;; KB CDC hook — fires POST /v1/admin/kb/hooks/mapping-changed to
+  ;; lithrim-backend after every successful mapping INSERT/UPDATE/DELETE.
+  ;; Fire-and-forget: mapping CRUD never blocks on KB availability.
+  :etlp-mapper.kb-hook/client
+  {:url        #duct/env ["KB_HOOK_URL" :or "http://localhost:8002/v1/admin/kb/hooks/mapping-changed"]
+   :secret     #duct/env ["KB_HOOK_SECRET" :or ""]
+   :enabled?   #duct/env ["KB_HOOK_ENABLED" Bool :or true]
+   :timeout-ms #duct/env ["KB_HOOK_TIMEOUT_MS" Int :or 2000]}
+  :etlp-mapper.kb-hook/middleware
+  {:client #ig/ref :etlp-mapper.kb-hook/client}
 
 
   :duct.migrator/ragtime
@@ -186,6 +204,18 @@ $$ LANGUAGE plpgsql;"]
   :etlp-mapper.handler/apply-mappings
   {:db #ig/ref :duct.database/sql
    :request {[_ id data] :ataraxy/result}}
+
+  :etlp-mapper.handler.copilot/generate
+  {:llm-provider      #duct/env ["COPILOT_LLM_PROVIDER" :or "azure"]
+   :llm-model         #duct/env ["COPILOT_LLM_MODEL" :or "gpt-4.1-mini"]
+   :azure-endpoint    #duct/env ["AZURE_OPENAI_ENDPOINT" :or ""]
+   :azure-api-key     #duct/env ["AZURE_OPENAI_API_KEY" :or ""]
+   :anthropic-api-key #duct/env ["ANTHROPIC_API_KEY" :or ""]}
+
+  ;; No config — the test-template handler just reuses engine/try-once
+  ;; for in-memory compile+apply, no DB or LLM access needed.
+  :etlp-mapper.handler.copilot/test-template
+  {}
 
   [:duct.handler.sql/insert :etlp-mapper.handler.mappings/create]
   {:request {[_ title content] :ataraxy/result

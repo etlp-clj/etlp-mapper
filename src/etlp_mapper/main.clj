@@ -4,7 +4,8 @@
             [etlp-mapper.pgtypes]
             [etlp-mapper.auth-component]
             [etlp-mapper.middlewares]
-            [etlp-mapper.handler.parse-hl7]))
+            [etlp-mapper.handler.parse-hl7]
+            [etlp-mapper.handler.copilot]))
 
 (duct/load-hierarchy)
 
