@@ -1,0 +1,15 @@
+{
+  "result": {
+    "resourceType": "Condition",
+    "code": {
+      "coding": [
+        {
+          "system": "http://hl7.org/fhir/sid/icd-10-cm",
+          "code": "I10",
+          "display": "Essential hypertension"
+        }
+      ]
+    }
+  },
+  "org/id": "lithrim-dev"
+}
