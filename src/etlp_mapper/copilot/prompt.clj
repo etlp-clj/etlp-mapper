@@ -8,6 +8,7 @@
    - the initial user prompt (sample input + expected output + description)
    - retry prompts with error or diff context"
   (:require [cheshire.core :as json]
+            [clojure.java.io :as io]
             [clojure.string :as str]))
 
 ;; ---------------------------------------------------------------------------
@@ -115,6 +116,63 @@ CRITICAL CONVENTIONS FOR THIS CODEBASE
   types, same nesting. If expected_output has `total_checks: 4` as a YAML
   number, produce a YAML number, not an expression that evaluates to 4.
 ")
+
+;; ---------------------------------------------------------------------------
+;; Spec addendum — rendered from resources/etlp_mapper/jute_dsl_spec.json.
+;; Keeps the copilot prompt in lock-step with what /jute-dsl-spec.json serves
+;; to external clients. Single source of truth for YAML-integration rules
+;; and antipatterns, so drift can't reintroduce the ternary / unquoted-`:`
+;; regressions that broke /mappings/generate output.
+;; ---------------------------------------------------------------------------
+
+(defn- render-yaml-integration [yaml]
+  (let [chars (->> (:must_quote_whole_scalar_when_expression_contains yaml)
+                   (map pr-str)
+                   (str/join " "))]
+    (str "YAML INTEGRATION\n"
+         (:overview yaml) "\n"
+         "- Leave unquoted only when the expression body contains: "
+         (:unquoted_safe_body_chars yaml) ".\n"
+         "- Double-quote the whole YAML scalar when the expression contains any of: "
+         chars ".\n"
+         "- " (:inside_double_quoted_yaml_note yaml) "\n"
+         "Examples:\n"
+         (str/join "\n"
+                   (for [ex (:examples yaml)]
+                     (str "  [" (:kind ex) "] " (:yaml ex)
+                          "\n    -> " (:note ex)))))))
+
+(defn- render-antipatterns [antis]
+  (str "ANTIPATTERNS (do NOT do these)\n"
+       (str/join "\n\n"
+                 (for [a antis]
+                   (str "- " (:name a) ":\n"
+                        "    " (:description a)
+                        (when-let [w (:wrong_example_yaml a)]
+                          (str "\n    Wrong:\n      "
+                               (str/replace w "\n" "\n      ")))
+                        (when-let [r (:right_example_yaml a)]
+                          (str "\n    Right:\n      "
+                               (str/replace r "\n" "\n      ")))
+                        (when-let [w (:wrong_example a)]
+                          (str "\n    Wrong:  " w))
+                        (when-let [r (:right_example a)]
+                          (str "\n    Right:  " r)))))))
+
+(defn- load-spec-addendum
+  "Read yaml_integration and antipatterns from the exposed Jute DSL spec and
+   render them as prose for the system prompt. Fails fast if the resource
+   is missing — these rules are required context for the copilot."
+  []
+  (let [spec (-> (io/resource "etlp_mapper/jute_dsl_spec.json")
+                 slurp
+                 (json/parse-string true)
+                 :jute_dsl_spec)]
+    (str (render-yaml-integration (:yaml_integration spec))
+         "\n\n"
+         (render-antipatterns (:antipatterns spec)))))
+
+(def ^:private spec-addendum (load-spec-addendum))
 
 ;; ---------------------------------------------------------------------------
 ;; Real few-shots pulled from production validators (ids 18, 26, 31). These
@@ -651,7 +709,11 @@ body:
         "validation templates for healthcare data (FHIR, HL7v2, custom JSON).\n\n"
         "=== DSL REFERENCE ===\n\n"
         dsl-reference
-        "\n=== FEW-SHOT EXAMPLES (REAL production templates) ===\n\n"
+        "\n=== YAML INTEGRATION & ANTIPATTERNS ===\n"
+        "(Mirrored from the Jute DSL spec served at GET /jute-dsl-spec.json — "
+        "external clients see the same rules.)\n\n"
+        spec-addendum
+        "\n\n=== FEW-SHOT EXAMPLES (REAL production templates) ===\n\n"
         (str/join "\n\n" (map-indexed format-few-shot few-shots))
         "\n\n=== OUTPUT FORMAT ===\n"
         "Respond with ONLY the Jute template as raw YAML. No markdown code "
@@ -709,7 +771,11 @@ body:
         "new section.\n\n"
         "=== DSL REFERENCE ===\n\n"
         dsl-reference
-        "\n=== FEW-SHOT EXAMPLES (REAL production templates) ===\n\n"
+        "\n=== YAML INTEGRATION & ANTIPATTERNS ===\n"
+        "(Mirrored from the Jute DSL spec served at GET /jute-dsl-spec.json — "
+        "external clients see the same rules.)\n\n"
+        spec-addendum
+        "\n\n=== FEW-SHOT EXAMPLES (REAL production templates) ===\n\n"
         (str/join "\n\n" (map-indexed format-few-shot few-shots))
         "\n\n=== EXTEND MODE RULES ===\n\n"
         "You will be given an EXISTING Jute template followed by a NEW "

@@ -660,6 +660,55 @@
       }
     },
 
+    "yaml_integration": {
+      "overview": "Templates are almost always written in YAML. The YAML parser runs before Jute sees the document, so YAML-level syntax errors short-circuit the compile step with a misleading 'mapping values are not allowed here' message. The #1 root cause is an unquoted $-scalar whose body contains YAML-significant punctuation.",
+      "unquoted_safe_body_chars": "identifiers, dots (.), digits, spaces, and the operators + - * / % = != > < && || !",
+      "must_quote_whole_scalar_when_expression_contains": [":", "?", "#", "[", "]", "{", "}", "|", ">", "&", "*", "!", "leading -"],
+      "inside_double_quoted_yaml_note": "Jute string literals still use double quotes inside the expression; they must be escaped as \\\" since the whole scalar is already double-quoted.",
+      "examples": [
+        {
+          "kind": "ok_unquoted",
+          "yaml": "status: $ resource.gender",
+          "note": "Body contains only identifiers and dots."
+        },
+        {
+          "kind": "requires_quoting",
+          "yaml": "url: \"$ \\\"/fhir/Patient/\\\" + id\"",
+          "note": "Jute expression contains a string literal with slashes and quote marks; wrap the whole YAML scalar in double quotes and escape inner quotes as \\\"."
+        },
+        {
+          "kind": "broken_bare_colon",
+          "yaml": "line2: $ addr.text != line1 ? addr.text : null",
+          "note": "Bare ':' inside the unquoted scalar terminates the YAML key. The parser emits 'mapping values are not allowed here'. Also: Jute has no ternary — see antipatterns.no_ternary_operator."
+        }
+      ]
+    },
+
+    "antipatterns": [
+      {
+        "name": "no_ternary_operator",
+        "description": "Jute has NO C-style ternary (cond ? a : b). Writing one fails at YAML parse (bare ':') AND at Jute compile. Always use the $if directive.",
+        "wrong_example_yaml": "line2: $ addr.text != line1 ? addr.text : null",
+        "right_example_yaml": "line2:\n  $if: $ addr.text != line1\n  $then: $ addr.text\n  $else: null"
+      },
+      {
+        "name": "prefer_if_over_logical_short_circuit_for_values",
+        "description": "|| and && are valid Jute operators, but when used to select a VALUE (rather than return a boolean), prefer $if. Reads clearer and avoids YAML-quoting foot-guns when combined with other punctuation.",
+        "wrong_example_yaml": "line1: $ addr.street.text || addr.text",
+        "right_example_yaml": "line1:\n  $if: $ addr.street.text\n  $then: $ addr.street.text\n  $else: $ addr.text"
+      },
+      {
+        "name": "single_quoted_string_literals_may_fail",
+        "description": "In the currently shipping Jute (0.2.x) runtime, single-quoted string literals inside expressions can fail to compile even though the formal spec allows them. Always use double quotes for string literals in expressions.",
+        "wrong_example": "$ gender = 'Male'",
+        "right_example": "$ gender = \"Male\""
+      },
+      {
+        "name": "no_markdown_fences_on_generated_template",
+        "description": "When a copilot emits a template, the response must be RAW YAML only. No triple-backtick code fences, no prose introduction, no trailing commentary. Servers that strip fences defensively still prefer clean input."
+      }
+    ],
+
     "data_types": [
       {"type": "string", "description": "Text values, quoted with single or double quotes in expressions"},
       {"type": "number", "description": "Integers and floating-point numbers. Arithmetic follows standard precedence."},
