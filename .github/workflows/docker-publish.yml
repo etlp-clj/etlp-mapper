@@ -9,7 +9,7 @@ name: Publish Docker image
 
 on:
   push:
-    branches: [master]
+    branches: [master, feat/sqlite-backend]
     tags: ["v*"]
   pull_request:
     branches: [master]
