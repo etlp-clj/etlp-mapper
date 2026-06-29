@@ -39,13 +39,14 @@
                                    #ig/ref :etlp-mapper.middlewares/cors
                                    #ig/ref :etlp-mapper.kb-hook/middleware]}
 
-  ;; KB CDC hook — fires POST /v1/admin/kb/hooks/mapping-changed to
-  ;; lithrim-backend after every successful mapping INSERT/UPDATE/DELETE.
-  ;; Fire-and-forget: mapping CRUD never blocks on KB availability.
+  ;; Optional outbound CDC webhook — fires POST KB_HOOK_URL after every
+  ;; successful mapping INSERT/UPDATE/DELETE so a downstream consumer can
+  ;; react. Fire-and-forget: mapping CRUD never blocks on it. Disabled by
+  ;; default; set KB_HOOK_ENABLED=true and KB_HOOK_URL to turn it on.
   :etlp-mapper.kb-hook/client
-  {:url        #duct/env ["KB_HOOK_URL" :or "http://localhost:8002/v1/admin/kb/hooks/mapping-changed"]
+  {:url        #duct/env ["KB_HOOK_URL" :or ""]
    :secret     #duct/env ["KB_HOOK_SECRET" :or ""]
-   :enabled?   #duct/env ["KB_HOOK_ENABLED" Bool :or true]
+   :enabled?   #duct/env ["KB_HOOK_ENABLED" Bool :or false]
    :timeout-ms #duct/env ["KB_HOOK_TIMEOUT_MS" Int :or 2000]}
   :etlp-mapper.kb-hook/middleware
   {:client #ig/ref :etlp-mapper.kb-hook/client}
@@ -172,6 +173,33 @@ $$ LANGUAGE plpgsql;"]
              RETURN NEW;
            END;
            $$ LANGUAGE plpgsql;"]}
+
+  ;; --- SQLite migration definitions. Inert under Postgres (only migrations
+  ;; --- listed in :duct.migrator/ragtime run). etlp-mapper.main swaps the
+  ;; --- ragtime list to these at boot when JDBC_URL is jdbc:sqlite. ---
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration-sqlite/create-mappings]
+  {:up ["CREATE TABLE mappings (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, content TEXT, org_id TEXT NOT NULL DEFAULT 'default', created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"]
+   :down ["DROP TABLE mappings"]}
+
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration-sqlite/create-mappings-history]
+  {:up ["CREATE TABLE mappings_history (id INTEGER PRIMARY KEY AUTOINCREMENT, original_id INTEGER, txnid TEXT, title TEXT NOT NULL, content TEXT, org_id TEXT NOT NULL DEFAULT 'default', created_at TEXT, updated_at TEXT)"]
+   :down ["DROP TABLE mappings_history"]}
+
+  ;; BEFORE UPDATE: snapshot OLD row into history; surrogate txnid (timestamp +
+  ;; random hex) since SQLite has no txid_current(). The WHEN guard captures a
+  ;; content/title edit but ignores the updated_at-only write below, so there is
+  ;; no spurious history row.
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration-sqlite/history-trigger]
+  {:up ["CREATE TRIGGER insert_mapping_history_trigger BEFORE UPDATE ON mappings FOR EACH ROW WHEN NEW.content IS NOT OLD.content OR NEW.title IS NOT OLD.title BEGIN INSERT INTO mappings_history (title, content, created_at, updated_at, original_id, org_id, txnid) VALUES (OLD.title, OLD.content, OLD.created_at, OLD.updated_at, OLD.id, OLD.org_id, strftime('%Y%m%d%H%M%f','now') || '-' || lower(hex(randomblob(4)))); END"]
+   :down ["DROP TRIGGER insert_mapping_history_trigger"]}
+
+  ;; AFTER UPDATE: bump updated_at via a nested UPDATE (SQLite can't assign NEW.*
+  ;; in a trigger). The SAME WHEN guard scopes it to real content/title edits, so
+  ;; the nested updated_at write re-fires neither trigger. Correct under any
+  ;; recursive_triggers setting: no history double-write, no recursion.
+  [:duct.migrator.ragtime/sql :etlp-mapper.migration-sqlite/updated-at-trigger]
+  {:up ["CREATE TRIGGER update_mapping_changetimestamp AFTER UPDATE ON mappings FOR EACH ROW WHEN NEW.content IS NOT OLD.content OR NEW.title IS NOT OLD.title BEGIN UPDATE mappings SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END"]
+   :down ["DROP TRIGGER update_mapping_changetimestamp"]}
 
 
 ;Query handlers for Rest Endpoints

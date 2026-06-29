@@ -11,9 +11,9 @@
     (fn [req]
       (handler (assoc req :identity
                       {:method :dev
-                       :org/id (or (System/getenv "DEV_ORG_ID") "lithrim-dev")
+                       :org/id (or (System/getenv "DEV_ORG_ID") "dev-org")
                        :claims {:sub "dev-user"
-                                :email "dev@lithrim.com"
+                                :email "dev@example.com"
                                 :roles ["owner"]}})))))
 
 (defmethod ig/init-key :etlp-mapper.auth-component/auth

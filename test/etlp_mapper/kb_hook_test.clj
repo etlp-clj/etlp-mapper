@@ -140,7 +140,7 @@
                                           {:status 202})]
       (let [wrapped (hook/wrap-mapping-change-hook
                       downstream
-                      {:url "http://lithrim/hook" :secret "S" :enabled? true})
+                      {:url "http://kb-consumer/hook" :secret "S" :enabled? true})
             _resp (wrapped {:request-method :post
                             :uri "/mappings"
                             :identity {:org/id "org-fire"}})]
@@ -148,7 +148,7 @@
         (Thread/sleep 100)
         (is (= 1 (count @calls)))
         (let [{:keys [url opts]} (first @calls)]
-          (is (= "http://lithrim/hook" url))
+          (is (= "http://kb-consumer/hook" url))
           (is (= "S" (get-in opts [:headers "X-ETLP-Hook-Secret"])))
           (is (re-find #"500" (:body opts)))
           (is (re-find #"insert" (:body opts)))

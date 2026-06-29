@@ -27,9 +27,17 @@ WORKDIR /app
 COPY --from=build /app/target/etlp-mapper-0.1.0-SNAPSHOT-standalone.jar /app/
 COPY --from=build /app/resources /app/resources
 
+# Data dir for the SQLite file. Mount an Azure Files volume here for
+# persistence across container restarts; leave unmounted for an ephemeral DB.
+RUN mkdir -p /data
+
 # Set the default port
 ENV PORT=3000
 
+# DB selection is entirely via JDBC_URL:
+#   Postgres (default): jdbc:postgresql://host:5432/db?user=...&password=...
+#   SQLite (no PG cost): jdbc:sqlite:/data/etlp-mapper.db?journal_mode=WAL&busy_timeout=5000
+# The app auto-detects the SQLite backend from the jdbc:sqlite prefix.
 ENV JDBC_URL=${JDBC_URL}
 
 # Expose the port

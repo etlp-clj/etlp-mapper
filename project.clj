@@ -1,6 +1,8 @@
 (defproject etlp-mapper "0.1.0-SNAPSHOT"
-  :description "ETLP: Mapper Service"
-  :url "http://example.com/FIXME"
+  :description "Low-code Jute DSL data-transformation microservice (SQLite or Postgres backend)"
+  :url "https://github.com/etlp-clj/etlp-mapper"
+  :license {:name "EPL-2.0"
+            :url "https://www.eclipse.org/legal/epl-2.0/"}
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.10.3"]
                  [duct/core "0.8.0"]
@@ -18,6 +20,7 @@
                  [clj-http "3.12.3"]
                  [com.health-samurai/jute "0.2.0-SNAPSHOT"]
                  [org.postgresql/postgresql "42.2.19"]
+                 [org.xerial/sqlite-jdbc "3.45.1.0"]
                  [org.clojars.aregee/etlp-hl7v2 "0.1.0"]
                  [org.flatland/ordered "1.15.12"]]
   :plugins [[duct/lein-duct "0.12.3"]

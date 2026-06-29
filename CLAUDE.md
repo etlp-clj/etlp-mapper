@@ -1,45 +1,49 @@
-# ETLP Mapper
+# etlp-mapper
 
-Clojure service that executes Jute DSL templates against incoming data payloads (FHIR, HL7v2, custom JSON) to produce conformant artifacts. Pairs with `lithrim-backend` as the structural-validation tier of the Lithrim verification pipeline. See `LITHRIM_SSOT.md` in `lithrim-backend` for product context.
+Clojure microservice that executes [Jute](https://github.com/HealthSamurai/jute.clj) DSL
+templates against incoming data payloads (FHIR, HL7v2, custom JSON) to produce
+conformant artifacts. Mappings are persisted, versioned, and applied over HTTP.
 
 ## Stack
 
-- **Lang:** Clojure (Leiningen)
-- **HTTP:** Reitit + Pedestal (port 3031)
-- **DB:** MongoDB (`velto` database — same instance as lithrim-backend; `mappings` collection)
-- **DSL:** Jute (custom YAML/JSON template engine)
-- **Copilot:** OpenAI gpt-4 / Azure for `/mappings/generate` LLM-driven template synthesis
+- **Lang:** Clojure (Leiningen), Duct/Integrant component system
+- **HTTP:** Reitit + Ataraxy on Ring/Jetty (default port 3000, override with `PORT`)
+- **DB:** SQL via `clojure.java.jdbc`. Two interchangeable backends selected at
+  runtime by `JDBC_URL`:
+  - **SQLite** (`jdbc:sqlite:...`) — zero-dependency default; see `docs/SQLITE_ACA.md`.
+  - **Postgres** (`jdbc:postgresql://...`) — for horizontal scale / many writers.
+- **DSL:** Jute (YAML/JSON template engine)
+- **Copilot (optional):** LLM-driven template synthesis for `/mappings/generate`
+  (OpenAI/Azure/Anthropic), enabled only when configured.
 
 ## Local Dev
 
 ```bash
-lein repl       # nREPL on default port
-lein run        # HTTP server on 3031
-lein test       # run unit tests
+lein repl       # nREPL for interactive development
+lein run        # HTTP server (SQLite or Postgres per JDBC_URL)
+lein test       # run unit + integration tests
 ```
 
-## Diagnose-before-edit gate (mandatory)
+## Backend selection
 
-When fixing any reported bug in mapping execution, template generation, or structural validation — especially when the symptom (wrong artifact, missing field, generation confidence drop) is driven by data flowing through multiple layers (Mongo `mappings` → engine → Jute interpreter → response) — the following gate is mandatory **before** opening any source file to edit:
-
-1. **Enumerate the layers** between source-of-truth and surface. For mapping execution: `mappings.{id}` Mongo doc → `etlp-mapper.handler.mapping/apply` route → `etlp-mapper.engine.execute` → Jute interpreter → JSON response. For copilot generation: prompt builder → OpenAI/Azure call → parser → optional /test-template → confidence scoring.
-2. **For each candidate layer, post the verbatim observation** in a fenced code block. Acceptable evidence:
-   - `mongosh velto --eval 'db.mappings.findOne({_id: ObjectId(...)})'` — the actual Mongo state
-   - `curl -X POST http://localhost:3031/mappings/{id}/test-template ...` — live engine output
-   - The exact line of Clojure (with `file:line` reference) being claimed buggy
-   - REPL session output showing `(jute.core/eval ...)` against the failing template
-3. **State the diagnosis only after the evidence block is posted.** Reference the verbatim observations by line / quote.
-4. **Tag every causal claim with confidence:** CONFIRMED (backed by evidence), INFERRED (chain of reasoning, no live check), HYPOTHESIS (untested, with falsification criteria).
-5. **No PR description, session log, or template-comment may contain a root-cause claim without an evidence block above it.** Untagged claims are treated as HYPOTHESIS by default.
-
-**Why this exists:** the cross-repo Lithrim guardrail (see `lithrim-backend/CLAUDE.md` and `lithrim-command-center/CLAUDE.md`) was added on `2026-05-02` after a session-2026-05-01 case-12 council mislabel diagnosis was stated confidently without pulling the persisted state — and the actual bug turned out to be in two downstream layers nobody had inspected. The same failure mode applies to ETLP: Jute template bugs often live in 4 layers (template body, runtime, validators, persisted mapping). Without forced evidence per layer, the wrong layer gets edited.
-
-**See also:**
-- `lithrim-backend/CLAUDE.md` (full gate text + canonical example)
-- `resources/etlp_mapper/jute_dsl_spec.json` (Jute YAML-integration rules — single source of truth for the copilot prompt)
+`etlp-mapper.main` inspects the environment at boot: a `JDBC_URL` starting with
+`jdbc:sqlite` (or `DB_DIALECT=sqlite`) selects the SQLite backend — it swaps in
+the SQLite migration set and loads the JSON-marshalling shim
+(`etlp-mapper.sqlitetypes`). Anything else uses Postgres. All routes, auth, the
+Jute engine, and the copilot are backend-agnostic. See `docs/SQLITE_ACA.md`.
 
 ## Conventions
 
-- Apply endpoint: `POST /mappings/{id}/apply` does NOT auto-wrap data (unlike `/test-template` and `/generate`); caller pre-wraps as `{data: {resource: <inner>}}` (see `lithrim-command-center/.lithrim/MEMORY.md` reference_etlp_mapper_apply_quirk).
-- YAML quoting: when a Jute expression body contains `: ! & * # | > "` or `[]{}` chars, the whole YAML scalar must be double-quoted. See `resources/etlp_mapper/jute_dsl_spec.json` for the formal rules. Copilot prompt is rendered from this file (do NOT drift the prompt out of the spec).
-- Connector-level structural validators live in `app/services/artifact_evaluator.py` on the `lithrim-backend` side; this repo only owns the mapping execution + generation.
+- The mapping execution path spans several layers: persisted `mappings` row →
+  `etlp-mapper.handler.mappings/apply` → the Jute engine → JSON response. When
+  debugging a wrong/missing field in an applied artifact, confirm which layer is
+  at fault (inspect the stored row, then the engine output) before editing —
+  Jute template bugs and data-marshalling bugs look identical at the response.
+- Apply endpoint: `POST /mappings/{id}/apply` does NOT auto-wrap the payload
+  (unlike `/test-template` and `/generate`); the caller pre-wraps as
+  `{data: {resource: <inner>}}`.
+- YAML quoting: when a Jute expression body contains `: ! & * # | > "` or
+  `[]{}` characters, the whole YAML scalar must be double-quoted. The formal
+  rules live in `resources/etlp_mapper/jute_dsl_spec.json`, which is also the
+  single source of truth rendered into the copilot prompt — do not drift the
+  prompt out of the spec.

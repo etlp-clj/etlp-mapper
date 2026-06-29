@@ -1,14 +1,17 @@
 (ns etlp-mapper.kb-hook
-  "CDC hook client for the lithrim-backend Template Pattern KB.
+  "Optional outbound change-data-capture (CDC) webhook.
 
-  Fires POST /v1/admin/kb/hooks/mapping-changed after any successful
-  INSERT / UPDATE / DELETE on the mappings table. Fire-and-forget via
-  `future` with a short timeout — mapping CRUD must never block on the
-  KB side (SPEC §P2-6.6 graceful-degradation discipline).
+  When configured, fires a POST to `KB_HOOK_URL` after any successful
+  INSERT / UPDATE / DELETE on the mappings table, so a downstream system
+  (e.g. a search index or knowledge base) can react to mapping changes.
+  Fire-and-forget via `future` with a short timeout — mapping CRUD must
+  never block on the webhook consumer's availability.
 
-  Auth: shared secret in the `X-ETLP-Hook-Secret` header. Lithrim compares
-  with `hmac.compare_digest`. Both deployments rotate the secret in
-  lockstep."
+  Disabled by default. Enable with `KB_HOOK_ENABLED=true` and set
+  `KB_HOOK_URL` (and optionally `KB_HOOK_SECRET`).
+
+  Auth: an optional shared secret is sent in the `X-ETLP-Hook-Secret`
+  header for the consumer to verify (use a constant-time comparison)."
   (:require
    [clj-http.client :as http]
    [cheshire.core :as json]
@@ -73,7 +76,7 @@
            :action     action})))))
 
 (defn fire-mapping-changed
-  "POST the mapping-changed event to lithrim. Fire-and-forget — any
+  "POST the mapping-changed event to the configured consumer. Fire-and-forget — any
   failure is logged (not re-raised) so the caller never observes the
   KB's availability. Returns the `future` so tests can deref to await."
   [{:keys [url secret enabled? timeout-ms]
