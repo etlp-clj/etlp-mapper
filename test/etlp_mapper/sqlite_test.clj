@@ -8,7 +8,8 @@
             [clojure.java.jdbc :as jdbc]
             [cheshire.core :as json]
             [duct.database.sql]
-            [etlp-mapper.sqlitetypes]              ; loads the JDBC protocol shim
+            [duct.handler.sql :as dhsql]
+            [etlp-mapper.sqlitetypes]              ; loads the JDBC protocol shim + insert! override
             [etlp-mapper.handler.mappings :as mappings])
   (:import [java.io File]))
 
@@ -68,3 +69,19 @@
             result   (mappings/apply-mapping boundary "acme" id {:any "payload"})]
         (is (= {:status "active"} result)
             "decoded content -> keywordize -> :yaml -> Jute compile -> apply")))))
+
+(deftest insert-returns-id-for-location
+  ;; duct.handler.sql/insert! must yield a map containing :id so the create
+  ;; handler's `:location "mappings/{id}"` resolves. SQLite's
+  ;; db-do-prepared-return-keys natively returns {(keyword "last_insert_rowid()") N};
+  ;; etlp-mapper.sqlitetypes re-binds insert! to also expose :id.
+  (let [db       (temp-db-spec)
+        boundary (duct.database.sql/->Boundary db)]
+    (jdbc/execute! db ["CREATE TABLE mappings (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, content TEXT, org_id TEXT NOT NULL DEFAULT 'default')"])
+    (let [k1 (dhsql/insert! boundary ["INSERT INTO mappings (title, content, org_id) VALUES (?,?,?)" "a" "{}" "acme"])
+          k2 (dhsql/insert! boundary ["INSERT INTO mappings (title, content, org_id) VALUES (?,?,?)" "b" "{}" "acme"])]
+      (is (= 1 (:id k1)) "first insert exposes :id=1 (not just :last_insert_rowid())")
+      (is (= 2 (:id k2)) ":id tracks the autoincrement rowid")
+      ;; query/execute! still work after re-extending the protocol
+      (is (= 2 (count (dhsql/query boundary ["SELECT * FROM mappings"]))))
+      (is (vector? (dhsql/execute! boundary ["UPDATE mappings SET title='x' WHERE id=1"]))))))

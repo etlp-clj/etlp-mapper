@@ -2,7 +2,7 @@
  :duct.core/environment :production
 
  :duct.server.http/jetty
- {:port 3031}
+ {:port #duct/env ["PORT" Int :or 3000]}
 
  :duct.database/sql
  {:connection-uri "jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres"}}
