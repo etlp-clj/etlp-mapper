@@ -48,7 +48,7 @@
 
 (deftest ignores-non-mapping-paths
   (let [req  {:request-method :post
-              :uri "/parse-hl7"
+              :uri "/mappings/test-template"
               :identity {:org/id "org-x"}}
         resp {:status 200}]
     (is (nil? (#'hook/resolve-mapping-event req resp)))))

@@ -14,7 +14,6 @@ variable. No code changes either way.
 - Persisted, versioned mappings (`/_history` per mapping) scoped by `org_id`.
 - Apply a stored Jute template to a payload over HTTP.
 - One-off template testing without persisting (`/mappings/test-template`).
-- HL7v2 parsing endpoint (`/parse-hl7`).
 - Optional LLM "copilot" to generate templates from examples (`/mappings/generate`).
 - Optional OIDC (Keycloak) auth — on by default, easy to disable for local/demo.
 - Optional outbound CDC webhook on mapping changes (off by default).
@@ -90,7 +89,6 @@ lein run
 | `GET` | `/mappings/{id}/_history/{txnid}` | A historical version |
 | `POST` | `/mappings/test-template` | Apply an ad-hoc template (no persistence) |
 | `POST` | `/mappings/generate` | Copilot: synthesize a template (requires LLM config) |
-| `POST` | `/parse-hl7` | Parse an HL7v2 message |
 | `GET` | `/openapi.json` | OpenAPI spec |
 | `GET` | `/jute-dsl-spec.json` | Jute DSL spec used by the copilot |
 

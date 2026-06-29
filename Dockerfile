@@ -17,8 +17,10 @@ COPY resources /app/resources
 # Build the JAR file
 RUN lein uberjar
 
-# Base Java image for running the application
-FROM openjdk:11-jre-slim AS run
+# Base Java image for running the application.
+# (The openjdk Docker Official Images are deprecated and 11-jre-slim was
+#  removed; eclipse-temurin is the current multi-arch successor.)
+FROM eclipse-temurin:11-jre-jammy AS run
 
 # Set the working directory
 WORKDIR /app
@@ -34,11 +36,10 @@ RUN mkdir -p /data
 # Set the default port
 ENV PORT=3000
 
-# DB selection is entirely via JDBC_URL:
-#   Postgres (default): jdbc:postgresql://host:5432/db?user=...&password=...
-#   SQLite (no PG cost): jdbc:sqlite:/data/etlp-mapper.db?journal_mode=WAL&busy_timeout=5000
+# DB selection is entirely via the JDBC_URL provided at runtime (-e JDBC_URL=...):
+#   SQLite (no external DB): jdbc:sqlite:/data/etlp-mapper.db?journal_mode=WAL&busy_timeout=5000
+#   Postgres:                jdbc:postgresql://host:5432/db?user=...&password=...
 # The app auto-detects the SQLite backend from the jdbc:sqlite prefix.
-ENV JDBC_URL=${JDBC_URL}
 
 # Expose the port
 EXPOSE $PORT

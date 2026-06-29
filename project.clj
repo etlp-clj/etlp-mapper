@@ -21,7 +21,6 @@
                  [com.health-samurai/jute "0.2.0-SNAPSHOT"]
                  [org.postgresql/postgresql "42.2.19"]
                  [org.xerial/sqlite-jdbc "3.45.1.0"]
-                 [org.clojars.aregee/etlp-hl7v2 "0.1.0"]
                  [org.flatland/ordered "1.15.12"]]
   :plugins [[duct/lein-duct "0.12.3"]
             [lein-cloverage "1.2.2"]

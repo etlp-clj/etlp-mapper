@@ -23,9 +23,6 @@
             [:post "/mappings/test-template"]
             [:etlp-mapper.handler.copilot/test-template]
 
-            [:post "/parse-hl7" {{:keys [message]} :body-params}]
-            [:etlp-mapper.handler/parse-hl7 message]
-
             [:get    "/mappings/" id] [:etlp-mapper.handler.mappings/find ^int id]
             [:get    "/mappings/" id "/_history"] [:etlp-mapper.handler.mappings/history ^int id]
             [:get    "/mappings/" id "/_history/" version] [:etlp-mapper.handler.mappings/traverse-history ^int id version]
@@ -221,9 +218,6 @@ $$ LANGUAGE plpgsql;"]
   {}
 
   :etlp-mapper.handler/jute-dsl-spec
-  {}
-
-  :etlp-mapper.handler/parse-hl7
   {}
 
   :etlp-mapper.handler/mappings
